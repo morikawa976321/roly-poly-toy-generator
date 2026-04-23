@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { DesignDetail } from "../types";
-import { getDesign, modelUrl, stlUrl, thumbUrl } from "../api";
+import { getDesign } from "../api";
 import MetricsPanel from "../components/MetricsPanel";
 import ModelViewer from "../components/ModelViewer";
+import { thumbnailDataUrl } from "../derive/thumbnailSvg";
+import { cappedGeometryFromGene } from "../derive/mesh";
+import { exportGeometryToStlBlob } from "../derive/stlExporter";
 
 export default function DetailPage() {
   const { id = "" } = useParams<{ id: string }>();
@@ -11,10 +14,21 @@ export default function DetailPage() {
   const [error, setError] = useState<string | null>(null);
   const detailThumbUrl = useMemo(() => {
     if (!data) return "";
-    const base = thumbUrl(data.design_id);
-    const sep = base.includes("?") ? "&" : "?";
-    return `${base}${sep}view=detail&zmax=${data.metrics.z_cog_max ?? "na"}`;
+    return thumbnailDataUrl(data.gene, data.metrics);
   }, [data]);
+
+  const stlBlobUrl = useMemo(() => {
+    if (!data) return "";
+    const geom = cappedGeometryFromGene(data.gene, 128);
+    const blob = exportGeometryToStlBlob(geom);
+    return URL.createObjectURL(blob);
+  }, [data]);
+
+  useEffect(() => {
+    return () => {
+      if (stlBlobUrl) URL.revokeObjectURL(stlBlobUrl);
+    };
+  }, [stlBlobUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +67,7 @@ export default function DetailPage() {
           <div className="md:col-span-2">
             <div className="flex items-center justify-end mb-2">
               <a
-                href={stlUrl(data.design_id)}
+                href={stlBlobUrl}
                 download={`${data.design_id}.stl`}
                 className="inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
               >
@@ -61,7 +75,7 @@ export default function DetailPage() {
               </a>
             </div>
             <ModelViewer
-              modelUrl={modelUrl(data.design_id)}
+              gene={data.gene}
               centroidZ={data.metrics.centroid_z}
               height={data.metrics.height}
             />

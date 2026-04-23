@@ -6,9 +6,9 @@ A generator and curated gallery of physically stable, self-righting 3D models.
 
 ## 構成
 
-- `backend/` — Python + FastAPI。gene の生成、断面 SVG / GLB の生成、SQLite への保存を担当。
+- `backend/` — Python + FastAPI。gene の生成と metrics 計算、Supabase Postgres への保存を担当。
 - `frontend/` — Vite + React + TypeScript + Tailwind v4 + react-three-fiber。一覧 (SVG サムネ) と 詳細 (3D ビュー) を提供。
-- `data/` — ランタイム状態（`app.db` と `assets/{design_id}/{thumb.svg,model.glb}`）。gitignored。
+- `supabase/` — DB スキーマ（マイグレーション SQL）。
 
 ## 必要なツール
 
@@ -26,6 +26,33 @@ python -m uv sync
 npm install
 npm --prefix frontend install
 ```
+
+## 環境変数（Supabase）
+
+ルートの `.env.example` を参考に `.env` を作成し、Supabase の値を設定する。
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+開発では `.env.local` を使ってもよい（バックエンドが自動で読み込む）。
+
+## localSupabase（開発）
+
+Supabase CLI を使ってローカルに Supabase を立ち上げ、そこへ接続して開発できる。
+
+```powershell
+# 初回または起動
+npm run supabase:start
+
+# DB を migrations に合わせて作り直す（supabase/migrations を適用）
+npm run supabase:reset
+```
+
+`npm run supabase:start` の出力に **API URL** と **service_role key** が表示されるので、
+それを `.env` に設定する。
+
+- `SUPABASE_URL`: 通常 `http://localhost:54321`
+- `SUPABASE_SERVICE_ROLE_KEY`: start 出力の service_role key
 
 ## 起動
 
@@ -65,8 +92,6 @@ npm run stop
 | ------ | --------------------------------------- | ----------------------------- |
 | POST   | `/api/designs/generate`                 | N 個のデザインを生成          |
 | GET    | `/api/designs?limit=..&offset=..`       | 一覧（新しい順）              |
-| GET    | `/api/designs/{id}`                     | 詳細（gene + metrics + URL） |
-| GET    | `/api/designs/{id}/thumb.svg`           | 断面サムネ                    |
-| GET    | `/api/designs/{id}/model.glb`           | 3D モデル                     |
+| GET    | `/api/designs/{id}`                     | 詳細（gene + metrics）        |
 
 OpenAPI は `http://localhost:8000/docs` で参照可能。

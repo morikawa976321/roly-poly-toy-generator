@@ -58,8 +58,6 @@ cover/
 # Django stuff:
 *.log
 local_settings.py
-db.sqlite3
-db.sqlite3-journal
 
 # Flask stuff:
 instance/
@@ -136,6 +134,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
 .envrc
 .venv
 env/
@@ -211,5 +210,10 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 
-# Runtime data (local app state: SQLite + generated assets)
+# Runtime data (local app state + generated assets)
 data/
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+supabase/snippets/

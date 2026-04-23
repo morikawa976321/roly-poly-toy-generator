@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import type { DesignSummary } from "../types";
-import { thumbUrl } from "../api";
+import { thumbnailDataUrl } from "../derive/thumbnailSvg";
 
 type Props = {
   design: DesignSummary;
@@ -9,7 +9,7 @@ type Props = {
 };
 
 export default function DesignCard({ design, selected, onToggleSelect }: Props) {
-  const { design_id, metrics } = design;
+  const { design_id, gene, metrics } = design;
   return (
     <Link
       to={`/designs/${design_id}`}
@@ -40,7 +40,7 @@ export default function DesignCard({ design, selected, onToggleSelect }: Props) 
       )}
       <div className="aspect-square bg-slate-100 flex items-center justify-center">
         <img
-          src={thumbUrl(design_id)}
+          src={thumbnailDataUrl(gene, metrics)}
           alt={design_id}
           className="max-h-full max-w-full p-2"
         />

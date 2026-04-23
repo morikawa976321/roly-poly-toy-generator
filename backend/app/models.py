@@ -73,6 +73,7 @@ class DesignSummary(BaseModel):
     """一覧ビュー向けの最小情報。"""
 
     design_id: str
+    gene: Gene
     metrics: Metrics
     created_at: str
 
@@ -84,8 +85,6 @@ class DesignDetail(BaseModel):
     gene: Gene
     metrics: Metrics
     created_at: str
-    thumbnail_url: str
-    model_url: str
 
 
 class GenerateRequest(BaseModel):
