@@ -3,8 +3,6 @@ import type {
   GenerateResponse,
   ListResponse,
 } from "./types";
-import type { SmoothingMethod } from "./smoothing";
-import { withSmoothingQuery } from "./smoothing";
 
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init);
@@ -18,22 +16,17 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
 export function listDesigns(
   limit = 200,
   offset = 0,
-  smoothing: SmoothingMethod = "bspline",
 ): Promise<ListResponse> {
   return jsonFetch<ListResponse>(
-    withSmoothingQuery(
-      `/api/designs?limit=${limit}&offset=${offset}`,
-      smoothing,
-    ),
+    `/api/designs?limit=${limit}&offset=${offset}`,
   );
 }
 
 export function getDesign(
   designId: string,
-  smoothing: SmoothingMethod = "bspline",
 ): Promise<DesignDetail> {
   return jsonFetch<DesignDetail>(
-    withSmoothingQuery(`/api/designs/${designId}`, smoothing),
+    `/api/designs/${designId}`,
   );
 }
 
@@ -57,21 +50,18 @@ export function deleteAllDesigns(): Promise<{ deleted: number }> {
 
 export function thumbUrl(
   designId: string,
-  smoothing: SmoothingMethod = "bspline",
 ): string {
-  return withSmoothingQuery(`/api/designs/${designId}/thumb.svg`, smoothing);
+  return `/api/designs/${designId}/thumb.svg`;
 }
 
 export function modelUrl(
   designId: string,
-  smoothing: SmoothingMethod = "bspline",
 ): string {
-  return withSmoothingQuery(`/api/designs/${designId}/model.glb`, smoothing);
+  return `/api/designs/${designId}/model.glb`;
 }
 
 export function stlUrl(
   designId: string,
-  smoothing: SmoothingMethod = "bspline",
 ): string {
-  return withSmoothingQuery(`/api/designs/${designId}/model.stl`, smoothing);
+  return `/api/designs/${designId}/model.stl`;
 }

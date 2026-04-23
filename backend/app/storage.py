@@ -20,7 +20,6 @@ from typing import List, Optional, Tuple
 
 from .config import ASSETS_DIR, DATA_DIR, DB_PATH
 from .models import DesignSummary, Gene, Metrics
-from .smoothing import SmoothingMethod
 
 
 SCHEMA = """
@@ -71,6 +70,98 @@ def init_db() -> None:
     with _connect() as conn:
         conn.executescript(SCHEMA)
         _ensure_v2_columns(conn)
+    # 旧方式のアセット（thumb_gaussian.svg 等）が残っていても、新仕様の単一名
+    # （thumb.svg / model.glb / model.stl）に統一して扱えるように移行する。
+    try:
+        migrate_assets_to_gaussian()
+    except Exception:
+        # 移行はベストエフォート（生成物の再生成で復旧できるため）。
+        pass
+
+
+def migrate_assets_to_gaussian() -> None:
+    """既存 `data/assets/*` を GAUSSIAN 単一キャッシュへ移行し、旧キャッシュを掃除する。
+
+    旧仕様では以下が混在し得る:
+    - 代表（旧）: `thumb.svg`, `model.glb`, `model.stl`
+    - 追加方式: `thumb_<method>.svg`, `model_<method>.glb`, `model_<method>.stl`
+
+    新仕様では method suffix を参照しないため、可能なら `*_gaussian.*` を正として
+    単一名へ置換し、無い場合は DB の gene から GAUSSIAN で再生成する。
+    """
+    _ensure_dirs()
+    if not ASSETS_DIR.exists():
+        return
+
+    # 遅延 import（重い依存/循環参照回避）
+    from .geometry import build_revolve_mesh, compute_metrics, export_glb, export_stl
+    from .thumbnail import render_thumbnail_svg
+
+    for child in ASSETS_DIR.iterdir():
+        if not child.is_dir():
+            continue
+        design_id = child.name
+        found = get_design(design_id)
+        if not found:
+            continue
+        gene, metrics_stored, _created_at = found
+
+        # まず `*_gaussian.*` があれば単一名へ採用
+        mapping = [
+            ("thumb_gaussian.svg", "thumb.svg"),
+            ("model_gaussian.glb", "model.glb"),
+            ("model_gaussian.stl", "model.stl"),
+        ]
+        for src, dst in mapping:
+            src_path = child / src
+            dst_path = child / dst
+            if src_path.exists():
+                try:
+                    dst_path.write_bytes(src_path.read_bytes())
+                except Exception:
+                    # text/svg の場合も bytes で統一して扱う
+                    dst_path.write_text(src_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+        # 無いものは GAUSSIAN で再生成（旧方式を残さない）
+        thumb_p = child / "thumb.svg"
+        model_p = child / "model.glb"
+        stl_p = child / "model.stl"
+
+        if not thumb_p.exists():
+            metrics = compute_metrics(gene).model_copy(
+                update={
+                    "z_cog_suggested": metrics_stored.z_cog_suggested,
+                    "bottom_curvature_radius": metrics_stored.bottom_curvature_radius,
+                    "z_cog_max": metrics_stored.z_cog_max,
+                }
+            )
+            svg = render_thumbnail_svg(gene, metrics)
+            thumb_p.write_text(svg, encoding="utf-8")
+
+        if not model_p.exists():
+            mesh = build_revolve_mesh(gene)
+            model_p.write_bytes(export_glb(mesh))
+
+        if not stl_p.exists():
+            mesh = build_revolve_mesh(gene)
+            stl_p.write_bytes(export_stl(mesh))
+
+        # 旧 suffix 付きキャッシュを削除（gaussian含む）
+        for p in child.glob("thumb_*.svg"):
+            try:
+                p.unlink()
+            except Exception:
+                pass
+        for p in child.glob("model_*.glb"):
+            try:
+                p.unlink()
+            except Exception:
+                pass
+        for p in child.glob("model_*.stl"):
+            try:
+                p.unlink()
+            except Exception:
+                pass
 
 
 def asset_dir(design_id: str) -> Path:
@@ -81,31 +172,20 @@ def asset_dir(design_id: str) -> Path:
 
 def thumb_path(
     design_id: str,
-    method: SmoothingMethod = SmoothingMethod.BSPLINE,
 ) -> Path:
-    # BSPLINE は代表アセットとして "thumb.svg" に保存する。
-    # 追加の方式は "thumb_<method>.svg" としてサイド・バイ・サイドでキャッシュする。
-    if method == SmoothingMethod.BSPLINE:
-        return asset_dir(design_id) / "thumb.svg"
-    return asset_dir(design_id) / f"thumb_{method.value}.svg"
+    return asset_dir(design_id) / "thumb.svg"
 
 
 def model_path(
     design_id: str,
-    method: SmoothingMethod = SmoothingMethod.BSPLINE,
 ) -> Path:
-    if method == SmoothingMethod.BSPLINE:
-        return asset_dir(design_id) / "model.glb"
-    return asset_dir(design_id) / f"model_{method.value}.glb"
+    return asset_dir(design_id) / "model.glb"
 
 
 def stl_path(
     design_id: str,
-    method: SmoothingMethod = SmoothingMethod.BSPLINE,
 ) -> Path:
-    if method == SmoothingMethod.BSPLINE:
-        return asset_dir(design_id) / "model.stl"
-    return asset_dir(design_id) / f"model_{method.value}.stl"
+    return asset_dir(design_id) / "model.stl"
 
 
 def exists(design_id: str) -> bool:
@@ -215,10 +295,10 @@ def list_designs(limit: int = 100, offset: int = 0) -> Tuple[List[DesignSummary]
 def list_designs_with_genes(
     limit: int = 100, offset: int = 0
 ) -> Tuple[List[Tuple[str, Gene, str]], int]:
-    """代表（BSPLINE）以外の smoothing で metrics を再計算したいときに使う、gene 付き列挙。
+    """gene 付きで designs を列挙する。
 
     返り値は ``(design_id, gene, created_at)`` のリストと件数。一覧の metrics を
-    動的に再計算するためだけに使う（DB の集計列は使わない）。
+    動的に再計算するためなどに使う（DB の集計列は使わない）。
     """
     with _connect() as conn:
         total_row = conn.execute("SELECT COUNT(*) AS c FROM designs").fetchone()

@@ -24,9 +24,8 @@
 
 ## 数値微分のノイズ対策
 
-``gene.radii`` は N_NODES=36 点しかないため、BSpline で密サンプルしてから
-np.gradient で r'', r'' を取ると、スプラインと微分の合成が高周波ノイズを
-生みやすい。対策として、
+``gene.radii`` は N_NODES=36 点しかないため、粗い折れ線のまま数値微分すると
+ノイズが出やすい。対策として、
 
 - gene 生成時は **パラメトリックな密プロファイル**（281 点）を直接 feasibility
   判定にかけることを推奨（``feasibility_from_profile``）。
@@ -39,8 +38,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.interpolate import BSpline
-from scipy.ndimage import gaussian_filter1d
 
 from .config import EPS_MM, TILT_MAX_DEG
 from .models import Gene
@@ -57,6 +54,22 @@ HEAD_SKIP_FRACTION: float = 0.03
 # 転がるときに接触点が連続に動かない（= 起き上がりこぼしにならない）。
 # 円錐や円柱を rejects するための閾値。典型サイズの 3〜5 倍を目安にする。
 RHO_M_CAP_MM: float = 200.0
+
+
+def _gaussian_filter1d(x: np.ndarray, sigma: float) -> np.ndarray:
+    """1D Gaussian smoothing with nearest edge handling (SciPy-free)."""
+    x = np.asarray(x, dtype=float)
+    sigma = float(sigma)
+    if not np.isfinite(sigma) or sigma <= 0.0:
+        return x
+    radius = int(max(3, round(4.0 * sigma)))
+    xs = np.arange(-radius, radius + 1, dtype=float)
+    k = np.exp(-0.5 * (xs / sigma) ** 2)
+    k /= np.sum(k)
+    pad_left = np.full(radius, x[0], dtype=float)
+    pad_right = np.full(radius, x[-1], dtype=float)
+    padded = np.concatenate([pad_left, x, pad_right])
+    return np.convolve(padded, k, mode="valid")
 
 
 @dataclass(frozen=True)
@@ -137,8 +150,8 @@ def feasibility_from_profile(
     if smooth_derivatives:
         # サンプル間隔の約 2 倍程度で軽く平滑化（高周波ノイズの抑制）
         sigma = max(1.0, len(z_asc) / 60.0)
-        rp = gaussian_filter1d(rp, sigma=sigma, mode="nearest")
-        rpp = gaussian_filter1d(rpp, sigma=sigma, mode="nearest")
+        rp = _gaussian_filter1d(rp, sigma=sigma)
+        rpp = _gaussian_filter1d(rpp, sigma=sigma)
 
     # 南極近傍の √z 型特異点による数値微分誤差を除くため、登り区間先頭を除外。
     head_skip = max(3, int(HEAD_SKIP_FRACTION * len(z_asc)))
@@ -215,9 +228,9 @@ def rolypoly_feasibility(
 ) -> Feasibility:
     """gene（radii）から feasibility を判定する（API / 既存 gene 用）。
 
-    radii を Gaussian で事前平滑化したあと PCHIP で補間し、その解析 2 階微分
-    で曲率を評価する。jitter 由来の高周波ノイズを除いたうえで radii の全体形を
-    評価できるので、生成時に付けた摂動が False Negative に結び付きにくい。
+    radii を密サンプルしてから、導関数評価前後で軽い Gaussian を掛けて
+    高周波ノイズを抑える。radii の全体形を保ったまま評価できるので、
+    生成時に付けた摂動が False Negative に結び付きにくい。
 
     ただし **生成時の値より保守的** な結果になることがある（平滑化で曲率が少し
     緩くなり、z_cog_max が小さめに出る傾向）。正確な値が欲しい場合は、生成時に
@@ -233,118 +246,28 @@ def rolypoly_feasibility(
             rho_m_bottom=0.0, suggested_z_cog=0.0, worst_margin=float("-inf"),
         )
 
-    # radii をクランプト B-スプラインの制御多角形として扱い、その解析 2 階微分
-    # から曲率を得る。variation-diminishing 性で高周波 jitter が減衰し、C² の
-    # 連続性で r'' が滑らかに出る。PCHIP（radii を exact に通る）と比べて、
-    # √z 型の底特異点を「球に近い連続曲線」として表現できる点が重要。
-    k = 3
-    # クランプトノット（smoothing.py._bspline と同じ構成）
-    t = np.concatenate([np.zeros(k), np.linspace(0.0, 1.0, n - k + 1), np.ones(k)])
-    spline = BSpline(t, radii, k, extrapolate=False)
+    # radii の z 配置規則: z_i = height · (i/(N-1))**alpha
+    alpha_raw = getattr(gene, "z_warp", None)
+    alpha = float(alpha_raw) if alpha_raw is not None and float(alpha_raw) > 0.0 else 1.0
+    u_nodes = np.linspace(0.0, 1.0, n)
+    z_nodes = height * (u_nodes ** alpha)
 
+    # radii は離散なので、同じ規則で dense な z を作り、線形補間で r(z) を作る。
     n_dense = 513
     u_dense = np.linspace(0.0, 1.0, n_dense)
-    r_dense = np.asarray(spline(u_dense), dtype=float)
+    z_dense = height * (u_dense ** alpha)
+    r_dense = np.interp(z_dense, z_nodes, radii)
 
-    # z 配置規則:  z(u) = height · u ** alpha
-    #   alpha=1（v1 / 旧 v2）: z = height·u, 線形
-    #   alpha=2（v2 既定）   : z = height·u², u=0 近傍で dz/du→0 ＝ dr/dz→∞
-    # rp, rpp は dr/dz, d²r/dz² を chain rule で計算する。
-    alpha_raw = getattr(gene, "z_warp", None)
-    alpha = float(alpha_raw) if alpha_raw is not None and alpha_raw > 0 else 1.0
-    dr_du = np.asarray(spline.derivative(1)(u_dense), dtype=float)
-    d2r_du2 = np.asarray(spline.derivative(2)(u_dense), dtype=float)
-    if abs(alpha - 1.0) < 1e-9:
-        # 旧パス: z = height·u → dz/du=height 定数。
-        rp = dr_du / height
-        rpp = d2r_du2 / (height * height)
-        z_dense = height * u_dense
-    else:
-        # dz/du = α·h·u^(α-1)、d²z/du² = α(α-1)·h·u^(α-2)。u=0 で 0/0 になるが、
-        # HEAD_SKIP で該当領域は評価から除外する（そもそも √z 型特異点領域）。
-        eps_u = 1e-12
-        u_safe = np.where(u_dense > eps_u, u_dense, eps_u)
-        dz_du = alpha * height * u_safe ** (alpha - 1.0)
-        d2z_du2 = alpha * (alpha - 1.0) * height * u_safe ** (alpha - 2.0)
-        rp = dr_du / dz_du
-        # d²r/dz² = (d²r/du² · dz/du − dr/du · d²z/du²) / (dz/du)³
-        rpp = (d2r_du2 * dz_du - dr_du * d2z_du2) / (dz_du ** 3)
-        z_dense = height * u_dense ** alpha
+    # jitter を抑えるため、r 自体にも軽く Gaussian を掛ける（端は nearest）。
+    sigma_r = max(1.0, n_dense / 140.0)
+    r_dense = _gaussian_filter1d(r_dense, sigma=sigma_r)
 
-    peak_idx = int(np.argmax(r_dense))
-    if peak_idx < 3:
-        return Feasibility(
-            is_feasible=False, z_cog_max=0.0, limiting_z=0.0,
-            rho_m_bottom=0.0, suggested_z_cog=0.0, worst_margin=float("-inf"),
-        )
-
-    z_asc = z_dense[: peak_idx + 1]
-    r_asc = r_dense[: peak_idx + 1]
-    rp_asc = rp[: peak_idx + 1]
-    rpp_asc = rpp[: peak_idx + 1]
-
-    # 3次 B-スプラインの 2 階微分は区分線形（C⁰）なので、制御点境界で小さな
-    # ギザつきが残ることがある。軽い Gaussian で均す。
-    sigma = max(1.0, len(z_asc) / 80.0)
-    rpp_asc = gaussian_filter1d(rpp_asc, sigma=sigma, mode="nearest")
-
-    rho_m = (1.0 + rp_asc * rp_asc) ** 1.5 / np.maximum(np.abs(rpp_asc), 1e-12)
-    rho_eff = rho_m - eps_mm
-
-    # radii 経由では、最初の 1〜2 制御点区間は √z 型特異点を表現できない
-    # （補間多項式は sqrt(z) を再現できない）。先頭 1 node 相当を強めに除外。
-    node_pitch_samples = n_dense // max(n - 1, 1)
-    head_skip = max(
-        int(HEAD_SKIP_FRACTION * len(z_asc)),
-        int(1.2 * node_pitch_samples),
-    )
-    cot_thmax = 1.0 / np.tan(np.deg2rad(theta_max_deg))
-    valid = (
-        (rp_asc >= cot_thmax)
-        & (rp_asc > 1e-6)
-        & np.isfinite(rho_eff)
-        & (rho_eff > 0)
-        & (rho_m < RHO_M_CAP_MM)
-    )
-    valid[:head_skip] = False
-
-    if not np.any(valid):
-        rho_pos = rho_m[rho_m > 0]
-        return Feasibility(
-            is_feasible=False, z_cog_max=0.0, limiting_z=0.0,
-            rho_m_bottom=float(np.median(rho_pos)) if rho_pos.size else 0.0,
-            suggested_z_cog=0.0, worst_margin=float("-inf"),
-        )
-
-    sqrt_term = np.sqrt(1.0 + rp_asc * rp_asc)
-    numer = rho_eff * sqrt_term - r_asc
-    with np.errstate(divide="ignore", invalid="ignore"):
-        z_cog_upper = z_asc + numer / np.where(rp_asc > 1e-9, rp_asc, np.nan)
-
-    z_cog_upper_valid = np.where(valid, z_cog_upper, np.inf)
-    limit_idx = int(np.argmin(z_cog_upper_valid))
-    z_cog_max_raw = float(z_cog_upper_valid[limit_idx])
-    limiting_z = float(z_asc[limit_idx])
-
-    projection_at_zero = (r_asc + rp_asc * (0.0 - z_asc)) / sqrt_term
-    margin_per = rho_eff - projection_at_zero
-    worst_margin = float(np.min(margin_per[valid]))
-
-    head_lo = max(head_skip, peak_idx // 20)
-    head_hi = max(head_lo + 2, peak_idx // 6)
-    rho_m_bottom = (
-        float(np.median(rho_m[head_lo:head_hi])) if head_hi > head_lo else float(rho_m[head_skip])
-    )
-
-    is_feasible = z_cog_max_raw > 0.0 and worst_margin > 0.0
-    z_cog_max = max(0.0, z_cog_max_raw) * safety_margin
-    suggested = 0.5 * z_cog_max if is_feasible else 0.0
-
-    return Feasibility(
-        is_feasible=is_feasible,
-        z_cog_max=z_cog_max,
-        limiting_z=limiting_z,
-        rho_m_bottom=rho_m_bottom,
-        suggested_z_cog=suggested,
-        worst_margin=worst_margin,
+    # 導関数は feasibility_from_profile 側でさらに平滑化できる。
+    return feasibility_from_profile(
+        z_dense,
+        r_dense,
+        theta_max_deg=theta_max_deg,
+        eps_mm=eps_mm,
+        safety_margin=safety_margin,
+        smooth_derivatives=True,
     )

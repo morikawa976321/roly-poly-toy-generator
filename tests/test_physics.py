@@ -170,13 +170,13 @@ def test_generated_gene_bottom_renders_as_sphere():
     では先頭ノード間隔が 2mm ほどあり、√z 特異点を表現できずに尖る。
     """
     from backend.app.gene import sample_gene_with_feasibility
-    from backend.app.smoothing import SmoothingMethod, smooth_profile
+    from backend.app.smoothing import smooth_profile
 
     gene, feas = sample_gene_with_feasibility(seed=42)
     assert gene.z_warp == 2.0
 
     # GAUSSIAN smoothing の dense プロファイルの底付近を評価。
-    z_dense, r_dense = smooth_profile(gene, SmoothingMethod.GAUSSIAN)
+    z_dense, r_dense = smooth_profile(gene)
     rb = feas.rho_m_bottom  # 物理モジュールが推定した曲率半径
     assert rb > 0
 

@@ -4,26 +4,23 @@ import type { DesignDetail } from "../types";
 import { getDesign, modelUrl, stlUrl, thumbUrl } from "../api";
 import MetricsPanel from "../components/MetricsPanel";
 import ModelViewer from "../components/ModelViewer";
-import { useSmoothing } from "../smoothing";
 
 export default function DetailPage() {
   const { id = "" } = useParams<{ id: string }>();
-  const { smoothing } = useSmoothing();
   const [data, setData] = useState<DesignDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const detailThumbUrl = useMemo(() => {
     if (!data) return "";
-    const base = thumbUrl(data.design_id, smoothing);
+    const base = thumbUrl(data.design_id);
     const sep = base.includes("?") ? "&" : "?";
-    // 詳細ビューはキャッシュを掴みやすいので、切替時に必ず再取得させる。
-    return `${base}${sep}view=detail&s=${smoothing}&zmax=${data.metrics.z_cog_max ?? "na"}`;
-  }, [data, smoothing]);
+    return `${base}${sep}view=detail&zmax=${data.metrics.z_cog_max ?? "na"}`;
+  }, [data]);
 
   useEffect(() => {
     let cancelled = false;
     setData(null);
     setError(null);
-    getDesign(id, smoothing)
+    getDesign(id)
       .then((d) => {
         if (!cancelled) setData(d);
       })
@@ -33,7 +30,7 @@ export default function DetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, smoothing]);
+  }, [id]);
 
   return (
     <div>
@@ -56,7 +53,7 @@ export default function DetailPage() {
           <div className="md:col-span-2">
             <div className="flex items-center justify-end mb-2">
               <a
-                href={stlUrl(data.design_id, smoothing)}
+                href={stlUrl(data.design_id)}
                 download={`${data.design_id}.stl`}
                 className="inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
               >
@@ -64,7 +61,7 @@ export default function DetailPage() {
               </a>
             </div>
             <ModelViewer
-              modelUrl={modelUrl(data.design_id, smoothing)}
+              modelUrl={modelUrl(data.design_id)}
               centroidZ={data.metrics.centroid_z}
               height={data.metrics.height}
             />
@@ -73,7 +70,7 @@ export default function DetailPage() {
             <div className="rounded-lg border border-slate-200 bg-white p-3">
               <div className="text-xs text-slate-500 mb-2">Cross-section</div>
               <img
-                key={`${data.design_id}:${smoothing}:${data.metrics.z_cog_max ?? "na"}`}
+                key={`${data.design_id}:${data.metrics.z_cog_max ?? "na"}`}
                 src={detailThumbUrl}
                 alt={data.design_id}
                 className="w-full"

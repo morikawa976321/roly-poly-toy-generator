@@ -2,10 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { DesignSummary } from "../types";
 import { deleteAllDesigns, generateDesigns, listDesigns } from "../api";
 import DesignCard from "../components/DesignCard";
-import { useSmoothing } from "../smoothing";
 
 export default function GalleryPage() {
-  const { smoothing } = useSmoothing();
   const [designs, setDesigns] = useState<DesignSummary[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -14,19 +12,18 @@ export default function GalleryPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // smoothing が変わるたびに metrics を含めて全件再取得する（サーバ側で再計算される）。
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await listDesigns(200, 0, smoothing);
+      const res = await listDesigns(200, 0);
       setDesigns(res.designs);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [smoothing]);
+  }, []);
 
   useEffect(() => {
     void refresh();

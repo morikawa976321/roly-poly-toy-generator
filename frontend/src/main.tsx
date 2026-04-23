@@ -2,15 +2,12 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
-import { SmoothingProvider } from "./smoothing";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
-      <SmoothingProvider>
-        <App />
-      </SmoothingProvider>
+      <App />
     </BrowserRouter>
   </React.StrictMode>,
 );
