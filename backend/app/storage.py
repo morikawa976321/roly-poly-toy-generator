@@ -6,25 +6,55 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from typing import Any, List, Optional, Tuple
 
 from supabase import Client, create_client
 
-from .config import SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL
+from .config import supabase_service_role_key, supabase_url
 from .models import DesignSummary, Gene, Metrics
 
 
 TABLE = "designs"
+logger = logging.getLogger(__name__)
+
+
+def _is_unique_violation(exc: Exception) -> bool:
+    """Postgres の unique_violation (SQLSTATE 23505) 相当かを雑に判定する。
+
+    Supabase/PostgREST の Python クライアントが返す例外型/属性はバージョンで揺れるため、
+    ここでは「見つけやすいヒント」を複合して判定する（安全側: 判定できなければ握らない）。
+    """
+
+    code = getattr(exc, "code", None)
+    if code == "23505":
+        return True
+
+    # 例: details / message / error dict などに 23505 が含まれるケース
+    for attr in ("details", "message", "error", "args"):
+        try:
+            val = getattr(exc, attr, None)
+            if val is None:
+                continue
+            if "23505" in str(val):
+                return True
+        except Exception:
+            continue
+
+    s = str(exc).lower()
+    return ("duplicate key value" in s) or ("unique constraint" in s)
 
 
 @lru_cache(maxsize=1)
 def _client() -> Client:
-    if not SUPABASE_URL:
+    url = supabase_url()
+    key = supabase_service_role_key()
+    if not url:
         raise RuntimeError("SUPABASE_URL is not set")
-    if not SUPABASE_SERVICE_ROLE_KEY:
+    if not key:
         raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is not set")
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    return create_client(url, key)
 
 
 def _row_to_metrics(row: dict[str, Any]) -> Metrics:
@@ -71,9 +101,13 @@ def upsert_design(
     # 既存IDは上書きしない（Supabase/PostgREST 側の unique 制約により insert が失敗したら無視する）。
     try:
         _client().table(TABLE).insert(payload).execute()
-    except Exception:
-        # 23505 (unique_violation) 相当などは、既存行を返すだけでよい。
-        pass
+    except Exception as e:
+        # 期待される失敗: 既に同じ design_id が存在する（unique_violation）
+        if _is_unique_violation(e):
+            pass
+        else:
+            logger.exception("Failed to insert design_id=%s into %s", design_id, TABLE)
+            raise
 
     found = get_design(design_id)
     if not found:
