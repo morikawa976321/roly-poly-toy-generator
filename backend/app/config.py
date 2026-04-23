@@ -8,6 +8,7 @@ v2 では gene のスキーマを「球キャップ底 + 5次多項式テーパ�
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # --- 形状の解像度 ------------------------------------------------------------
@@ -233,6 +234,20 @@ HEIGHT_MAX_MM: float = 80.0
 # --- パス --------------------------------------------------------------------
 
 REPO_ROOT: Path = Path(__file__).resolve().parents[2]
-DATA_DIR: Path = REPO_ROOT / "data"
-ASSETS_DIR: Path = DATA_DIR / "assets"
-DB_PATH: Path = DATA_DIR / "app.db"
+
+# --- Supabase ----------------------------------------------------------------
+#
+# NOTE: backend は DB を Supabase Postgres に移行したため、SQLite のパスは保持しない。
+# これらは起動時に環境変数から与える（ローカル .env / デプロイ環境の設定）。
+#
+# 開発では `.env.local`（推奨）/ `.env` から読む。存在しない場合は環境変数のみ。
+try:
+    from dotenv import load_dotenv  # type: ignore
+
+    load_dotenv(REPO_ROOT / ".env.local", override=False)
+    load_dotenv(REPO_ROOT / ".env", override=False)
+except Exception:
+    pass
+
+SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "")
+SUPABASE_SERVICE_ROLE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")

@@ -155,22 +155,23 @@ def build_revolve_mesh(
                     assert a_axis is not None
                     b0 = ring_vert(i + 1, j)
                     b1 = ring_vert(i + 1, jn)
-                    # 外向きになるように順序を揃える（z が上方向）
-                    faces.append((b0, b1, a_axis))
+                    # 外向き（側面法線が半径方向）になる順序
+                    faces.append((b1, b0, a_axis))
                 elif r_b <= eps:
                     # 上側が軸点（扇形）
                     assert b_axis is not None
                     a0 = ring_vert(i, j)
                     a1 = ring_vert(i, jn)
-                    faces.append((a1, a0, b_axis))
+                    faces.append((a0, a1, b_axis))
                 else:
                     a0 = ring_vert(i, j)
                     a1 = ring_vert(i, jn)
                     b0 = ring_vert(i + 1, j)
                     b1 = ring_vert(i + 1, jn)
                     # 四角形を 2 三角形に分割
-                    faces.append((a0, b0, b1))
-                    faces.append((a0, b1, a1))
+                    # ねじれない対角で分割しつつ外向き winding を維持する
+                    faces.append((a0, b1, b0))
+                    faces.append((a0, a1, b1))
 
         # 天面キャップ（上端が円なら円盤で塞ぐ）
         z_top = float(z_line[-1])
@@ -182,8 +183,8 @@ def build_revolve_mesh(
                 jn = (j + 1) % n_theta
                 a = ring_vert(top_i, j)
                 b = ring_vert(top_i, jn)
-                # 上面の法線が +z を向く向き
-                faces.append((a, b, top_center))
+                # 外向き（上面は +z）になるように center-fan の順序に統一する
+                faces.append((top_center, a, b))
 
         # 底面キャップ（v1 互換: 下端が円なら円盤で塞ぐ）
         z_bot = float(z_line[0])

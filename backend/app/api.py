@@ -3,10 +3,7 @@
 エンドポイント:
     POST /api/designs/generate  -> N 個のデザインを生成し、サマリを返す
     GET  /api/designs           -> 一覧（新しい順、ページング対応）
-    GET  /api/designs/{id}      -> 詳細（gene・metrics・アセット URL）
-    GET  /api/designs/{id}/thumb.svg
-    GET  /api/designs/{id}/model.glb
-    GET  /api/designs/{id}/model.stl
+    GET  /api/designs/{id}      -> 詳細（gene・metrics）
 """
 
 from __future__ import annotations
@@ -14,11 +11,10 @@ from __future__ import annotations
 from typing import List
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
 
 from .config import BATCH_SIZE
 from .gene import breed_gene_with_feasibility, sample_gene_with_feasibility
-from .geometry import build_revolve_mesh, compute_metrics, export_glb, export_stl
+from .geometry import compute_metrics
 from .identify import design_id_for
 from .models import (
     DesignDetail,
@@ -33,69 +29,11 @@ from .storage import (
     exists,
     get_design,
     list_designs,
-    model_path,
-    stl_path,
-    thumb_path,
     upsert_design,
 )
-from .thumbnail import render_thumbnail_svg
 
 
 router = APIRouter(prefix="/api")
-
-
-def _asset_urls(design_id: str) -> tuple[str, str]:
-    return (
-        f"/api/designs/{design_id}/thumb.svg",
-        f"/api/designs/{design_id}/model.glb",
-    )
-
-
-def _ensure_thumb(design_id: str) -> "FileResponse":
-    path = thumb_path(design_id)
-    if path.exists():
-        return FileResponse(path, media_type="image/svg+xml")
-
-    found = get_design(design_id)
-    if not found:
-        raise HTTPException(status_code=404, detail="Design not found")
-    gene, metrics_stored, _ = found
-    # サムネは重心（centroid_z）が smoothing に依存するため再計算するが、
-    # 青十字の基準である z_cog_max など feasibility 由来の値は smoothing 非依存なので引き継ぐ。
-    metrics = compute_metrics(gene).model_copy(
-        update={
-            "z_cog_suggested": metrics_stored.z_cog_suggested,
-            "bottom_curvature_radius": metrics_stored.bottom_curvature_radius,
-            "z_cog_max": metrics_stored.z_cog_max,
-        }
-    )
-    svg = render_thumbnail_svg(gene, metrics)
-    path.write_text(svg, encoding="utf-8")
-    return FileResponse(path, media_type="image/svg+xml")
-
-
-def _ensure_model(design_id: str) -> "FileResponse":
-    path = model_path(design_id)
-    if not path.exists():
-        found = get_design(design_id)
-        if not found:
-            raise HTTPException(status_code=404, detail="Design not found")
-        gene, _metrics_stored, _ = found
-        mesh = build_revolve_mesh(gene)
-        path.write_bytes(export_glb(mesh))
-    return FileResponse(path, media_type="model/gltf-binary")
-
-
-def _ensure_stl(design_id: str) -> "FileResponse":
-    path = stl_path(design_id)
-    if not path.exists():
-        found = get_design(design_id)
-        if not found:
-            raise HTTPException(status_code=404, detail="Design not found")
-        gene, _metrics_stored, _ = found
-        mesh = build_revolve_mesh(gene)
-        path.write_bytes(export_stl(mesh))
-    return FileResponse(path, media_type="model/stl")
 
 
 @router.post("/designs/generate", response_model=GenerateResponse)
@@ -143,10 +81,7 @@ def generate_designs(payload: GenerateRequest | None = None) -> GenerateResponse
             "bottom_curvature_radius": feasibility.rho_m_bottom,
             "z_cog_max": feasibility.z_cog_max,
         })
-        mesh = build_revolve_mesh(gene)
-        glb = export_glb(mesh)
-        svg = render_thumbnail_svg(gene, metrics)
-        summary = upsert_design(did, gene, metrics, svg, glb)
+        summary = upsert_design(did, gene, metrics)
         created.append(summary)
 
     return GenerateResponse(designs=created)
@@ -168,44 +103,13 @@ def get_design_endpoint(
     found = get_design(design_id)
     if not found:
         raise HTTPException(status_code=404, detail="Design not found")
-    gene, metrics_baseline, created_at = found
-    metrics = metrics_baseline
-    thumb_url, model_url = _asset_urls(design_id)
+    gene, metrics, created_at = found
     return DesignDetail(
         design_id=design_id,
         gene=gene,
         metrics=metrics,
         created_at=created_at,
-        thumbnail_url=thumb_url,
-        model_url=model_url,
     )
-
-
-@router.get("/designs/{design_id}/thumb.svg")
-def get_thumb(
-    design_id: str,
-) -> FileResponse:
-    if not exists(design_id):
-        raise HTTPException(status_code=404, detail="Design not found")
-    return _ensure_thumb(design_id)
-
-
-@router.get("/designs/{design_id}/model.glb")
-def get_model(
-    design_id: str,
-) -> FileResponse:
-    if not exists(design_id):
-        raise HTTPException(status_code=404, detail="Design not found")
-    return _ensure_model(design_id)
-
-
-@router.get("/designs/{design_id}/model.stl")
-def get_stl(
-    design_id: str,
-) -> FileResponse:
-    if not exists(design_id):
-        raise HTTPException(status_code=404, detail="Design not found")
-    return _ensure_stl(design_id)
 
 
 @router.delete("/designs", response_model=DeleteAllResponse)

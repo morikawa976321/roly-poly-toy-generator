@@ -47,21 +47,3 @@ export function generateDesigns(
 export function deleteAllDesigns(): Promise<{ deleted: number }> {
   return jsonFetch<{ deleted: number }>(`/api/designs`, { method: "DELETE" });
 }
-
-export function thumbUrl(
-  designId: string,
-): string {
-  return `/api/designs/${designId}/thumb.svg`;
-}
-
-export function modelUrl(
-  designId: string,
-): string {
-  return `/api/designs/${designId}/model.glb`;
-}
-
-export function stlUrl(
-  designId: string,
-): string {
-  return `/api/designs/${designId}/model.stl`;
-}

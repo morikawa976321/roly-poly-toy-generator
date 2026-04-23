@@ -145,7 +145,7 @@ export default function GalleryPage() {
                 すべて削除しますか？
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                {designs.length}件のデザイン（保存済みサムネイル・モデルを含む）を完全に削除します。
+                {designs.length}件のデザインを完全に削除します。
               </div>
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-slate-200 p-3">

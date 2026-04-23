@@ -10,6 +10,7 @@ export type Metrics = {
 
 export type DesignSummary = {
   design_id: string;
+  gene: Gene;
   metrics: Metrics;
   created_at: string;
 };
@@ -28,8 +29,6 @@ export type DesignDetail = {
   gene: Gene;
   metrics: Metrics;
   created_at: string;
-  thumbnail_url: string;
-  model_url: string;
 };
 
 export type ListResponse = {
