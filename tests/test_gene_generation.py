@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from backend.app.config import GENE_VERSION, N_NODES, TILT_MAX_DEG
 from backend.app.gene import breed_gene_with_feasibility, sample_gene, sample_gene_with_feasibility
-from backend.app.physics import feasibility_from_profile
+from backend.app.physics import feasibility_from_profile, rolypoly_feasibility
 
 
 # ----------------------------- 基本特性 ------------------------------------
@@ -110,6 +111,12 @@ def test_breed_gene_with_feasibility_basic():
     for seed in range(20):
         g, feas = breed_gene_with_feasibility(parents, seed=seed)
         assert feas.is_feasible
+        # 方針A: breedの返す feasibility は必ず子gene由来
+        feas2 = rolypoly_feasibility(g)
+        assert feas2.is_feasible
+        assert feas2.z_cog_max == pytest.approx(feas.z_cog_max, rel=0.0, abs=0.0)
+        assert feas2.suggested_z_cog == pytest.approx(feas.suggested_z_cog, rel=0.0, abs=0.0)
+        assert feas2.rho_m_bottom == pytest.approx(feas.rho_m_bottom, rel=0.0, abs=0.0)
         assert g.version == GENE_VERSION
         assert g.N == N_NODES
         assert g.bottom_radius == 0.0

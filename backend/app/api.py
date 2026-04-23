@@ -70,6 +70,9 @@ def generate_designs(payload: GenerateRequest | None = None) -> GenerateResponse
             gene, feasibility = breed_gene_with_feasibility(parents)
         else:
             gene, feasibility = sample_gene_with_feasibility()
+        # 安全弁: 生成関数のバグ等で不成立が混入しても保存しない。
+        if not feasibility.is_feasible:
+            continue
         did = design_id_for(gene)
         if exists(did):
             continue
