@@ -2,7 +2,7 @@
 
 gene は折れ線 r(z) プロファイルを表しており、本モジュールでは以下を行う:
 - z 値を等間隔に展開する。
-- 滑らか化方式に応じて (z, r) を細かくサンプリングする。
+- (z, r) を細かくサンプリングする。
 - 各サンプル区間を円錐台とみなし、公式で体積・重心・最大幅を解析的に
   求める（サンプル密度が十分なら平滑曲線の回転体体積の良い近似になる）。
 - 3D 表示用に回転体メッシュを作り、GLB バイト列としてエクスポートする。
@@ -17,23 +17,21 @@ import trimesh
 
 from .config import REVOLVE_SEGMENTS
 from .models import Gene, Metrics
-from .smoothing import SmoothingMethod, smooth_profile
+from .smoothing import smooth_profile
 
 
 def profile_points(
     gene: Gene,
-    method: SmoothingMethod = SmoothingMethod.BSPLINE,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """滑らか化方式に従って (z, r) サンプル列を返す。
+    """(z, r) サンプル列を返す。
 
     DENSE_FACTOR 倍に細かいサンプルが返る。どれも r[0]=bottom_radius, r[-1]=0 を満たす。
     """
-    return smooth_profile(gene, method)
+    return smooth_profile(gene)
 
 
 def compute_metrics(
     gene: Gene,
-    method: SmoothingMethod = SmoothingMethod.BSPLINE,
 ) -> Metrics:
     """volume / height / max_width / centroid_z を求める。
 
@@ -44,7 +42,7 @@ def compute_metrics(
         z_c （区間底からの相対値） = dz * (a^2 + 2ab + 3b^2)
                                      / (4 * (a^2 + ab + b^2))
     """
-    z, r = profile_points(gene, method)
+    z, r = profile_points(gene)
     dz = np.diff(z)
     a = r[:-1]
     b = r[1:]
@@ -74,7 +72,6 @@ def compute_metrics(
 
 def build_revolve_mesh(
     gene: Gene,
-    method: SmoothingMethod = SmoothingMethod.BSPLINE,
     sections: int = REVOLVE_SEGMENTS,
 ) -> trimesh.Trimesh:
     """2D プロファイルを z 軸回りに回転させて「閉じた」3D メッシュを作る。
@@ -86,7 +83,7 @@ def build_revolve_mesh(
     `trimesh.creation.revolve` の出力は端面が開く場合があるため、生成後に
     穴埋めを行い watertight（ソリッド）を保証する。
     """
-    z, r = profile_points(gene, method)
+    z, r = profile_points(gene)
     # 数値誤差で端点がわずかに浮くとキャップが張られず穴になるのでハード固定する。
     r = np.asarray(r, dtype=float)
     if len(r) >= 2:

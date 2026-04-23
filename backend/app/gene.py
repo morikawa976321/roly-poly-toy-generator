@@ -222,7 +222,7 @@ def sample_gene_with_feasibility(
     """feasibility を満たす v2 gene と、生成時に計算した feasibility を返す。
 
     feasibility は **摂動前の密パラメトリックプロファイル**（281 点）上で
-    評価する。これは BSpline / PCHIP を介した低解像度再評価より精度が高く、
+    評価する。これは低解像度の再評価より精度が高く、
     z_cog_suggested としてそのまま保存できる値になる。
 
     摂動（jitter）は保存形（radii）にだけ影響し、物理的な形はほぼ変わらないため、

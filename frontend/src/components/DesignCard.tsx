@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 import type { DesignSummary } from "../types";
 import { thumbUrl } from "../api";
-import { useSmoothing } from "../smoothing";
 
 type Props = {
   design: DesignSummary;
@@ -11,7 +10,6 @@ type Props = {
 
 export default function DesignCard({ design, selected, onToggleSelect }: Props) {
   const { design_id, metrics } = design;
-  const { smoothing } = useSmoothing();
   return (
     <Link
       to={`/designs/${design_id}`}
@@ -42,7 +40,7 @@ export default function DesignCard({ design, selected, onToggleSelect }: Props) 
       )}
       <div className="aspect-square bg-slate-100 flex items-center justify-center">
         <img
-          src={thumbUrl(design_id, smoothing)}
+          src={thumbUrl(design_id)}
           alt={design_id}
           className="max-h-full max-w-full p-2"
         />

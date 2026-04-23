@@ -28,7 +28,6 @@ from __future__ import annotations
 import argparse
 import math
 from dataclasses import dataclass
-from enum import Enum
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 
@@ -59,13 +58,6 @@ class Params:
     max_dz: float = 0.8
     # backend/app/smoothing.py を使う場合の密化倍率（大きいほど滑らかだが重い）
     smoothing_dense_factor: int = 16
-
-
-class ProfileSmoothing(str, Enum):
-    NONE = "none"
-    BSPLINE = "bspline"
-    PCHIP = "pchip"
-    GAUSSIAN = "gaussian"
 
 
 def sphere_r(rb: float, z: float) -> float:
@@ -235,24 +227,15 @@ def _try_smooth_with_backend(
     r_nodes: Sequence[float],
     *,
     height: float,
-    method: ProfileSmoothing,
     dense_factor: int,
 ) -> Optional[Tuple[List[float], List[float]]]:
     """
-    backend/app/smoothing.py の実装を流用して (z,r) を密サンプル化する。
+    (z,r) を密サンプル化する（スタンドアロン用の簡易実装）。
 
-    注意:
-    - smoothing.smooth_profile() は末端半径を 0 に固定する仕様なので、
-      ここでは内部関数（_bspline/_pchip/_gaussian）を呼び、端点は
-      r_nodes[0], r_nodes[-1] を維持する。
-    - NumPy/SciPy が無い環境では None を返してフォールバックする。
+    - NumPy が無い環境では None を返してフォールバックする。
     """
-    if method == ProfileSmoothing.NONE:
-        return None
-
     try:
         import numpy as np  # type: ignore
-        from backend.app import smoothing as sm  # type: ignore
     except Exception:
         return None
 
@@ -267,15 +250,19 @@ def _try_smooth_with_backend(
     n_dense = (n_nodes - 1) * dense_factor + 1
     z_dense = np.linspace(0.0, float(height), n_dense)
 
-    if method == ProfileSmoothing.BSPLINE:
-        # z が等間隔という前提で radii を Bスプライン評価
-        r_dense = sm._bspline(r_nodes_np, len(z_dense))
-    elif method == ProfileSmoothing.PCHIP:
-        r_dense = sm._pchip(z_nodes_np, r_nodes_np, z_dense)
-    elif method == ProfileSmoothing.GAUSSIAN:
-        r_dense = sm._gaussian(z_nodes_np, r_nodes_np, z_dense)
-    else:
-        return None
+    # 線形補間で密化
+    r_dense = np.interp(z_dense, z_nodes_np, r_nodes_np)
+    # 離散ガウシアン畳み込み（SciPyなしで動くように自前実装）
+    sigma = float(max(1.0, dense_factor))
+    radius = int(max(3, round(4.0 * sigma)))
+    xs = np.arange(-radius, radius + 1, dtype=float)
+    k = np.exp(-0.5 * (xs / sigma) ** 2)
+    k /= np.sum(k)
+    # nearest 相当の端処理
+    pad_left = np.full(radius, r_dense[0], dtype=float)
+    pad_right = np.full(radius, r_dense[-1], dtype=float)
+    padded = np.concatenate([pad_left, r_dense, pad_right])
+    r_dense = np.convolve(padded, k, mode="valid")
 
     # 端点固定 + 負値クリップ（数値誤差対策）
     r_dense[0] = float(r_nodes_np[0])
@@ -288,7 +275,6 @@ def smooth_profile_points(
     profile: Sequence[Tuple[float, float]],
     *,
     height: float,
-    method: ProfileSmoothing,
     dense_factor: int,
     n_nodes: int = 33,
 ) -> Sequence[Tuple[float, float]]:
@@ -298,9 +284,6 @@ def smooth_profile_points(
     - profile は任意のサンプル列（単調増→単調減の単峰を想定）
     - いったん z を等間隔 n_nodes 点にし、r を線形補間して制御点とする
     """
-    if method == ProfileSmoothing.NONE:
-        return profile
-
     # 等間隔ノードを作って r を補間（profile は z 昇順のはず）
     n_nodes = int(max(9, n_nodes))
     z_nodes = [height * i / (n_nodes - 1) for i in range(n_nodes)]
@@ -328,7 +311,6 @@ def smooth_profile_points(
         z_nodes,
         r_nodes,
         height=height,
-        method=method,
         dense_factor=dense_factor,
     )
     if smoothed is None:
@@ -370,8 +352,6 @@ def integrate_volume_and_com_z(profile: Sequence[Tuple[float, float]]) -> Tuple[
 
 def tune_height_for_delta(
     p: Params,
-    *,
-    smoothing_method: ProfileSmoothing,
 ) -> Tuple[float, float, List[Tuple[float, float]]]:
     """
     delta が delta_target に近づくように、上部高さ（height）を二分探索で調整する。
@@ -391,7 +371,6 @@ def tune_height_for_delta(
             smooth_profile_points(
                 prof,
                 height=h,
-                method=smoothing_method,
                 dense_factor=p.smoothing_dense_factor,
             )
         )
@@ -560,12 +539,6 @@ def main() -> None:
     ap.add_argument("--tilt", type=float, default=Params.tilt_deg, help="Validate tilt range [-tilt, +tilt] (deg).")
     ap.add_argument("--n-theta", type=int, default=Params.n_theta, help="Angular tessellation.")
     ap.add_argument(
-        "--smooth",
-        choices=[m.value for m in ProfileSmoothing],
-        default=ProfileSmoothing.BSPLINE.value,
-        help="断面プロファイルを backend/app/smoothing.py で滑らか化（利用不可なら自動フォールバック）",
-    )
-    ap.add_argument(
         "--smooth-factor",
         type=int,
         default=Params.smoothing_dense_factor,
@@ -584,8 +557,7 @@ def main() -> None:
         smoothing_dense_factor=max(2, args.smooth_factor),
     )
 
-    smoothing_method = ProfileSmoothing(args.smooth)
-    height, z_com, profile = tune_height_for_delta(p, smoothing_method=smoothing_method)
+    height, z_com, profile = tune_height_for_delta(p)
     V, z_com = integrate_volume_and_com_z(profile)
 
     ok, worst_margin = validate_constraint(p, z_com)
@@ -599,7 +571,7 @@ def main() -> None:
     print(f"cap_angle     : {p.cap_angle_deg:.2f} deg")
     print(f"rt            : {p.rt:.3f} mm")
     print(f"height        : {height:.3f} mm")
-    print(f"smoothing     : {args.smooth} (factor={p.smoothing_dense_factor})")
+    print(f"smoothing     : gaussian (factor={p.smoothing_dense_factor})")
     print(f"profile points: {len(profile)}")
     print(f"volume        : {V/1000.0:.3f} cm^3")
     print(f"z_com         : {z_com:.3f} mm (from bottom tip)")

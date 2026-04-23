@@ -7,10 +7,6 @@
     GET  /api/designs/{id}/thumb.svg
     GET  /api/designs/{id}/model.glb
     GET  /api/designs/{id}/model.stl
-
-``smoothing`` クエリ（bspline|gaussian）で曲線生成ロジックを切り替えて比較できる。
-代表（bspline）以外の指定時は、ディスクに <method> 付きキャッシュアセットを書き出し、
-以降はキャッシュから返す。
 """
 
 from __future__ import annotations
@@ -32,13 +28,11 @@ from .models import (
     GenerateResponse,
     ListResponse,
 )
-from .smoothing import SmoothingMethod
 from .storage import (
     delete_all_designs,
     exists,
     get_design,
     list_designs,
-    list_designs_with_genes,
     model_path,
     stl_path,
     thumb_path,
@@ -50,30 +44,17 @@ from .thumbnail import render_thumbnail_svg
 router = APIRouter(prefix="/api")
 
 
-def _asset_urls(design_id: str, method: SmoothingMethod) -> tuple[str, str]:
-    # 代表（BSPLINE）はクエリ無し。追加方式はクエリ付きで返し、フロント側でそのまま使えるようにする。
-    suffix = "" if method == SmoothingMethod.BSPLINE else f"?smoothing={method.value}"
+def _asset_urls(design_id: str) -> tuple[str, str]:
     return (
-        f"/api/designs/{design_id}/thumb.svg{suffix}",
-        f"/api/designs/{design_id}/model.glb{suffix}",
+        f"/api/designs/{design_id}/thumb.svg",
+        f"/api/designs/{design_id}/model.glb",
     )
 
 
-def _ensure_thumb(design_id: str, method: SmoothingMethod) -> "FileResponse":
-    path = thumb_path(design_id, method)
+def _ensure_thumb(design_id: str) -> "FileResponse":
+    path = thumb_path(design_id)
     if path.exists():
-        # 代表（BSPLINE）は既存キャッシュをそのまま使う。
-        if method == SmoothingMethod.BSPLINE:
-            return FileResponse(path, media_type="image/svg+xml")
-
-        # 以前の実装で作られた gaussian キャッシュは青十字が欠ける場合がある。
-        # "#3b82f6"（青十字の色）が無いときは再生成して置き換える。
-        try:
-            cached = path.read_text(encoding="utf-8")
-        except Exception:
-            cached = ""
-        if "#3b82f6" in cached:
-            return FileResponse(path, media_type="image/svg+xml")
+        return FileResponse(path, media_type="image/svg+xml")
 
     found = get_design(design_id)
     if not found:
@@ -81,38 +62,38 @@ def _ensure_thumb(design_id: str, method: SmoothingMethod) -> "FileResponse":
     gene, metrics_stored, _ = found
     # サムネは重心（centroid_z）が smoothing に依存するため再計算するが、
     # 青十字の基準である z_cog_max など feasibility 由来の値は smoothing 非依存なので引き継ぐ。
-    metrics = compute_metrics(gene, method).model_copy(
+    metrics = compute_metrics(gene).model_copy(
         update={
             "z_cog_suggested": metrics_stored.z_cog_suggested,
             "bottom_curvature_radius": metrics_stored.bottom_curvature_radius,
             "z_cog_max": metrics_stored.z_cog_max,
         }
     )
-    svg = render_thumbnail_svg(gene, metrics, method)
+    svg = render_thumbnail_svg(gene, metrics)
     path.write_text(svg, encoding="utf-8")
     return FileResponse(path, media_type="image/svg+xml")
 
 
-def _ensure_model(design_id: str, method: SmoothingMethod) -> "FileResponse":
-    path = model_path(design_id, method)
+def _ensure_model(design_id: str) -> "FileResponse":
+    path = model_path(design_id)
     if not path.exists():
         found = get_design(design_id)
         if not found:
             raise HTTPException(status_code=404, detail="Design not found")
         gene, _metrics_stored, _ = found
-        mesh = build_revolve_mesh(gene, method)
+        mesh = build_revolve_mesh(gene)
         path.write_bytes(export_glb(mesh))
     return FileResponse(path, media_type="model/gltf-binary")
 
 
-def _ensure_stl(design_id: str, method: SmoothingMethod) -> "FileResponse":
-    path = stl_path(design_id, method)
+def _ensure_stl(design_id: str) -> "FileResponse":
+    path = stl_path(design_id)
     if not path.exists():
         found = get_design(design_id)
         if not found:
             raise HTTPException(status_code=404, detail="Design not found")
         gene, _metrics_stored, _ = found
-        mesh = build_revolve_mesh(gene, method)
+        mesh = build_revolve_mesh(gene)
         path.write_bytes(export_stl(mesh))
     return FileResponse(path, media_type="model/stl")
 
@@ -154,9 +135,7 @@ def generate_designs(payload: GenerateRequest | None = None) -> GenerateResponse
         did = design_id_for(gene)
         if exists(did):
             continue
-        # 保存時は常に代表（BSPLINE）ベースの metrics・アセットで代表とする
-        # （ID や DB 上の体積などを滑らか化方式に依存させないため）。
-        metrics = compute_metrics(gene, SmoothingMethod.BSPLINE)
+        metrics = compute_metrics(gene)
         # 生成時に計算した feasibility（密パラメトリックプロファイル上の正確な値）
         # を metrics に詰めて保存する。radii 経由で後から再計算するより精度が高い。
         metrics = metrics.model_copy(update={
@@ -164,9 +143,9 @@ def generate_designs(payload: GenerateRequest | None = None) -> GenerateResponse
             "bottom_curvature_radius": feasibility.rho_m_bottom,
             "z_cog_max": feasibility.z_cog_max,
         })
-        mesh = build_revolve_mesh(gene, SmoothingMethod.BSPLINE)
+        mesh = build_revolve_mesh(gene)
         glb = export_glb(mesh)
-        svg = render_thumbnail_svg(gene, metrics, SmoothingMethod.BSPLINE)
+        svg = render_thumbnail_svg(gene, metrics)
         summary = upsert_design(did, gene, metrics, svg, glb)
         created.append(summary)
 
@@ -177,55 +156,21 @@ def generate_designs(payload: GenerateRequest | None = None) -> GenerateResponse
 def list_designs_endpoint(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
-    smoothing: SmoothingMethod = Query(default=SmoothingMethod.BSPLINE),
 ) -> ListResponse:
-    # 代表（BSPLINE）は DB に保存済みの集計列をそのまま返す（安いパス）。
-    if smoothing == SmoothingMethod.BSPLINE:
-        items, total = list_designs(limit=limit, offset=offset)
-        return ListResponse(designs=items, total=total)
-
-    # 非 LINEAR は、保存されている全 gene を取り出して metrics を再計算する。
-    # compute_metrics は polynomial 評価 + 円錐台積和のみで数ミリ秒／件なので、
-    # 数百件規模のギャラリーなら同期で十分速い。
-    # feasibility 関連の値（z_cog_suggested, bottom_curvature_radius）は
-    # smoothing 非依存の形状プロパティなので、代表（BSPLINE）時の DB 値も併読して引き継ぐ。
-    rows, total = list_designs_with_genes(limit=limit, offset=offset)
-    stored_items, _ = list_designs(limit=limit, offset=offset)
-    stored_by_id = {s.design_id: s.metrics for s in stored_items}
-    items: List[DesignSummary] = []
-    for did, gene, created_at in rows:
-        m = compute_metrics(gene, smoothing)
-        stored = stored_by_id.get(did)
-        if stored is not None:
-            m = m.model_copy(update={
-                "z_cog_suggested": stored.z_cog_suggested,
-                "bottom_curvature_radius": stored.bottom_curvature_radius,
-                "z_cog_max": stored.z_cog_max,
-            })
-        items.append(DesignSummary(design_id=did, metrics=m, created_at=created_at))
+    items, total = list_designs(limit=limit, offset=offset)
     return ListResponse(designs=items, total=total)
 
 
 @router.get("/designs/{design_id}", response_model=DesignDetail)
 def get_design_endpoint(
     design_id: str,
-    smoothing: SmoothingMethod = Query(default=SmoothingMethod.BSPLINE),
 ) -> DesignDetail:
     found = get_design(design_id)
     if not found:
         raise HTTPException(status_code=404, detail="Design not found")
     gene, metrics_baseline, created_at = found
-    # 代表以外のときは metrics を計算し直し、リアルタイムに差分を観察できるようにする。
-    # feasibility 関連は smoothing 非依存なので DB 値を引き継ぐ。
-    if smoothing == SmoothingMethod.BSPLINE:
-        metrics = metrics_baseline
-    else:
-        metrics = compute_metrics(gene, smoothing).model_copy(update={
-            "z_cog_suggested": metrics_baseline.z_cog_suggested,
-            "bottom_curvature_radius": metrics_baseline.bottom_curvature_radius,
-            "z_cog_max": metrics_baseline.z_cog_max,
-        })
-    thumb_url, model_url = _asset_urls(design_id, smoothing)
+    metrics = metrics_baseline
+    thumb_url, model_url = _asset_urls(design_id)
     return DesignDetail(
         design_id=design_id,
         gene=gene,
@@ -239,31 +184,28 @@ def get_design_endpoint(
 @router.get("/designs/{design_id}/thumb.svg")
 def get_thumb(
     design_id: str,
-    smoothing: SmoothingMethod = Query(default=SmoothingMethod.BSPLINE),
 ) -> FileResponse:
     if not exists(design_id):
         raise HTTPException(status_code=404, detail="Design not found")
-    return _ensure_thumb(design_id, smoothing)
+    return _ensure_thumb(design_id)
 
 
 @router.get("/designs/{design_id}/model.glb")
 def get_model(
     design_id: str,
-    smoothing: SmoothingMethod = Query(default=SmoothingMethod.BSPLINE),
 ) -> FileResponse:
     if not exists(design_id):
         raise HTTPException(status_code=404, detail="Design not found")
-    return _ensure_model(design_id, smoothing)
+    return _ensure_model(design_id)
 
 
 @router.get("/designs/{design_id}/model.stl")
 def get_stl(
     design_id: str,
-    smoothing: SmoothingMethod = Query(default=SmoothingMethod.BSPLINE),
 ) -> FileResponse:
     if not exists(design_id):
         raise HTTPException(status_code=404, detail="Design not found")
-    return _ensure_stl(design_id, smoothing)
+    return _ensure_stl(design_id)
 
 
 @router.delete("/designs", response_model=DeleteAllResponse)

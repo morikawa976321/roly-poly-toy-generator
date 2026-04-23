@@ -11,15 +11,13 @@ import numpy as np
 
 from .geometry import profile_points
 from .models import Gene, Metrics
-from .smoothing import SmoothingMethod
 
 
 def render_thumbnail_svg(
     gene: Gene,
     metrics: Metrics,
-    method: SmoothingMethod = SmoothingMethod.BSPLINE,
 ) -> str:
-    z, r = profile_points(gene, method)
+    z, r = profile_points(gene)
     height = float(gene.height)
     max_r = float(r.max())
 
