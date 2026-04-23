@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Final
 
 # --- 形状の解像度 ------------------------------------------------------------
 
@@ -235,19 +236,42 @@ HEIGHT_MAX_MM: float = 80.0
 
 REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 
+# --- 環境変数の初期化 ---------------------------------------------------------
+#
+# 重要: このモジュールは「定数置き場」として広く import されるため、
+# import した瞬間に .env を読むような副作用は置かない。
+#
+# `.env.local` / `.env` の読み込みはアプリ起動境界（create_app 等）から
+# 明示的に呼び出す。
+
+DOTENV_FILES: Final[tuple[Path, Path]] = (REPO_ROOT / ".env.local", REPO_ROOT / ".env")
+
+
+def load_environment() -> None:
+    """ローカル開発用に .env を読み込む（存在しない場合は何もしない）。"""
+    try:
+        from dotenv import load_dotenv  # type: ignore
+
+        # 既に設定されている環境変数（CI / 本番設定）を優先する。
+        load_dotenv(DOTENV_FILES[0], override=False)
+        load_dotenv(DOTENV_FILES[1], override=False)
+    except Exception:
+        # dotenv が無い/ファイルが無い等は無視してよい
+        return
+
+
+def supabase_url() -> str:
+    return os.environ.get("SUPABASE_URL", "")
+
+
+def supabase_service_role_key() -> str:
+    return os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
 # --- Supabase ----------------------------------------------------------------
 #
 # NOTE: backend は DB を Supabase Postgres に移行したため、SQLite のパスは保持しない。
 # これらは起動時に環境変数から与える（ローカル .env / デプロイ環境の設定）。
 #
-# 開発では `.env.local`（推奨）/ `.env` から読む。存在しない場合は環境変数のみ。
-try:
-    from dotenv import load_dotenv  # type: ignore
-
-    load_dotenv(REPO_ROOT / ".env.local", override=False)
-    load_dotenv(REPO_ROOT / ".env", override=False)
-except Exception:
-    pass
-
-SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "")
-SUPABASE_SERVICE_ROLE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+# 互換のため名前は残す（値は import 時点で固定しない）。
+SUPABASE_URL: str = ""
+SUPABASE_SERVICE_ROLE_KEY: str = ""
