@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/api.ts","./src/main.tsx","./src/types.ts","./src/components/designcard.tsx","./src/components/metricspanel.tsx","./src/components/modelviewer.tsx","./src/pages/detailpage.tsx","./src/pages/gallerypage.tsx"],"errors":true,"version":"5.9.3"}
