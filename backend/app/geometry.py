@@ -80,8 +80,9 @@ def build_revolve_mesh(
     - v1: r(0)=bottom_radius>0, r(height)=0（上端は軸上、下端は円盤キャップが必要）
     - v2: r(0)=0（下端は軸上）, r(height)=rt>=0（上端が円盤になり得るのでキャップが必要）
 
-    `trimesh.creation.revolve` の出力は端面が開く場合があるため、生成後に
-    穴埋めを行い watertight（ソリッド）を保証する。
+    v2 gene では通常 r(height)=rt>0 のため、側面だけでは天面に境界ループ（穴）が残る。
+    そのため、ここでは端面（天面/底面）のキャップを明示的に生成し、決定的に
+    watertight（ソリッド）なメッシュを構築する。
     """
     z, r = profile_points(gene)
     # 数値誤差で端点がわずかに浮くとキャップが張られず穴になるのでハード固定する。
@@ -89,27 +90,143 @@ def build_revolve_mesh(
     if len(r) >= 2:
         r[0] = float(gene.radii[0])
         r[-1] = float(gene.radii[-1])
-    # trimesh.creation.revolve は (半径, 軸) の 2D 折れ線を期待する。
-    linestring = np.column_stack([r, z])
-    mesh = trimesh.creation.revolve(linestring=linestring, sections=sections)
-    # 頂点付近で重複・退化三角形が出ることがあるので、process で整える。
-    mesh.process(validate=True)
 
-    # v2 の「天面が円になる」ケース等で境界ループが残るのでキャップを張る。
-    # fill_holes は in-place で境界を塞ぐ（塞げた数 or bool を返す）。
-    if not mesh.is_watertight:
+    def _revolve_watertight(
+        z_line: np.ndarray, r_line: np.ndarray, *, n_theta: int, eps: float = 1e-6
+    ) -> trimesh.Trimesh:
+        z_line = np.asarray(z_line, dtype=float).reshape(-1)
+        r_line = np.asarray(r_line, dtype=float).reshape(-1)
+        if z_line.size != r_line.size or z_line.size < 2:
+            raise ValueError("profile must have same-length z and r with >= 2 points")
+        if n_theta < 3:
+            raise ValueError("n_theta must be >= 3")
+
+        # 数値誤差で極小の半径が残ると、境界が残って watertight を壊しやすい。
+        # 端点は「軸上にあるべき」なら 0 にスナップする。
+        r0 = float(r_line[0])
+        r1 = float(r_line[-1])
+        if abs(r0) <= eps:
+            r0 = 0.0
+        if abs(r1) <= eps:
+            r1 = 0.0
+        r_line = r_line.copy()
+        r_line[0] = r0
+        r_line[-1] = r1
+
+        theta = np.linspace(0.0, 2.0 * np.pi, int(n_theta), endpoint=False)
+        ct = np.cos(theta)
+        st = np.sin(theta)
+
+        verts: list[tuple[float, float, float]] = []
+        ring_index: list[int] = []
+        axis_index: list[int | None] = []
+
+        for zi, ri in zip(z_line.tolist(), r_line.tolist()):
+            if ri <= eps:
+                axis_index.append(len(verts))
+                ring_index.append(-1)
+                verts.append((0.0, 0.0, float(zi)))
+            else:
+                axis_index.append(None)
+                ring_index.append(len(verts))
+                for c, s in zip(ct.tolist(), st.tolist()):
+                    verts.append((float(ri * c), float(ri * s), float(zi)))
+
+        faces: list[tuple[int, int, int]] = []
+
+        def ring_vert(i: int, j: int) -> int:
+            base = ring_index[i]
+            if base < 0:
+                raise RuntimeError("ring_vert called for axis point")
+            return base + (j % n_theta)
+
+        # 側面（隣接断面を接続）
+        for i in range(len(z_line) - 1):
+            r_a = float(r_line[i])
+            r_b = float(r_line[i + 1])
+            a_axis = axis_index[i]
+            b_axis = axis_index[i + 1]
+            for j in range(n_theta):
+                jn = (j + 1) % n_theta
+                if r_a <= eps and r_b <= eps:
+                    continue
+                if r_a <= eps:
+                    # 下側が軸点（扇形）
+                    assert a_axis is not None
+                    b0 = ring_vert(i + 1, j)
+                    b1 = ring_vert(i + 1, jn)
+                    # 外向きになるように順序を揃える（z が上方向）
+                    faces.append((b0, b1, a_axis))
+                elif r_b <= eps:
+                    # 上側が軸点（扇形）
+                    assert b_axis is not None
+                    a0 = ring_vert(i, j)
+                    a1 = ring_vert(i, jn)
+                    faces.append((a1, a0, b_axis))
+                else:
+                    a0 = ring_vert(i, j)
+                    a1 = ring_vert(i, jn)
+                    b0 = ring_vert(i + 1, j)
+                    b1 = ring_vert(i + 1, jn)
+                    # 四角形を 2 三角形に分割
+                    faces.append((a0, b0, b1))
+                    faces.append((a0, b1, a1))
+
+        # 天面キャップ（上端が円なら円盤で塞ぐ）
+        z_top = float(z_line[-1])
+        if float(r_line[-1]) > eps:
+            top_center = len(verts)
+            verts.append((0.0, 0.0, z_top))
+            top_i = len(z_line) - 1
+            for j in range(n_theta):
+                jn = (j + 1) % n_theta
+                a = ring_vert(top_i, j)
+                b = ring_vert(top_i, jn)
+                # 上面の法線が +z を向く向き
+                faces.append((a, b, top_center))
+
+        # 底面キャップ（v1 互換: 下端が円なら円盤で塞ぐ）
+        z_bot = float(z_line[0])
+        if float(r_line[0]) > eps:
+            bot_center = len(verts)
+            verts.append((0.0, 0.0, z_bot))
+            bot_i = 0
+            for j in range(n_theta):
+                jn = (j + 1) % n_theta
+                a = ring_vert(bot_i, j)
+                b = ring_vert(bot_i, jn)
+                # 底面の法線が -z を向く向き
+                faces.append((b, a, bot_center))
+
+        mesh = trimesh.Trimesh(
+            vertices=np.asarray(verts, dtype=float),
+            faces=np.asarray(faces, dtype=np.int64),
+            process=False,
+        )
+        # trimesh の process() は環境によって SciPy 依存（連結成分など）を踏むことがある。
+        # ここでは決定的に構築した面をそのまま使い、軽量な後処理のみを試す。
         try:
-            mesh.fill_holes()
+            mesh.remove_duplicate_faces()
         except Exception:
-            # fill_holes が失敗しても後続の repair を試す。
             pass
-    if not mesh.is_watertight:
         try:
-            trimesh.repair.fill_holes(mesh)
+            mesh.remove_degenerate_faces()
         except Exception:
             pass
-    # 最後にもう一度正規化（法線や退化面の整理）
-    mesh.process(validate=True)
+        try:
+            mesh.remove_unreferenced_vertices()
+        except Exception:
+            pass
+        return mesh
+
+    mesh = _revolve_watertight(z, r, n_theta=int(sections), eps=1e-6)
+    if not mesh.is_watertight:
+        # 後段で穴あきアセットがキャッシュされると永続的に壊れるため、ここで失敗扱いにする。
+        raise RuntimeError(
+            "build_revolve_mesh: generated mesh is not watertight "
+            f"(sections={sections}, r0={float(r[0]):.6g}, r1={float(r[-1]):.6g}, "
+            f"verts={int(mesh.vertices.shape[0])}, faces={int(mesh.faces.shape[0])})"
+        )
     return mesh
 
 
