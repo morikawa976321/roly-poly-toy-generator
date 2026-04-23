@@ -14,8 +14,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from .config import BATCH_SIZE
 from .gene import breed_gene_with_feasibility, sample_gene_with_feasibility
-from .geometry import compute_metrics
 from .identify import design_id_for
+from .metrics import compute_metrics
 from .models import (
     DesignDetail,
     DesignSummary,
