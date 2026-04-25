@@ -47,3 +47,7 @@ export function generateDesigns(
 export function deleteAllDesigns(): Promise<{ deleted: number }> {
   return jsonFetch<{ deleted: number }>(`/api/designs`, { method: "DELETE" });
 }
+
+export function exitApp(): Promise<{ status: string }> {
+  return jsonFetch<{ status: string }>(`/api/app/exit`, { method: "POST" });
+}

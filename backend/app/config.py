@@ -8,8 +8,8 @@ v2 では gene のスキーマを「球キャップ底 + 5次多項式テーパ�
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
+import sys
 from typing import Final
 
 # --- 形状の解像度 ------------------------------------------------------------
@@ -236,42 +236,51 @@ HEIGHT_MAX_MM: float = 80.0
 
 REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 
-# --- 環境変数の初期化 ---------------------------------------------------------
-#
-# 重要: このモジュールは「定数置き場」として広く import されるため、
-# import した瞬間に .env を読むような副作用は置かない。
-#
-# `.env.local` / `.env` の読み込みはアプリ起動境界（create_app 等）から
-# 明示的に呼び出す。
+# --- ローカルアプリ設定 -------------------------------------------------------
 
-DOTENV_FILES: Final[tuple[Path, Path]] = (REPO_ROOT / ".env.local", REPO_ROOT / ".env")
+APP_NAME: Final[str] = "roly-poly-toy-generator"
+LOCAL_DATA_DIRNAME: Final[str] = "data"
+LOCAL_CACHE_DIRNAME: Final[str] = "cache"
+LOCAL_DB_FILENAME: Final[str] = "app.db"
+IDLE_SHUTDOWN_SECONDS: Final[int] = 10 * 60
 
 
 def load_environment() -> None:
-    """ローカル開発用に .env を読み込む（存在しない場合は何もしない）。"""
-    try:
-        from dotenv import load_dotenv  # type: ignore
+    """互換用フック。
 
-        # 既に設定されている環境変数（CI / 本番設定）を優先する。
-        load_dotenv(DOTENV_FILES[0], override=False)
-        load_dotenv(DOTENV_FILES[1], override=False)
-    except Exception:
-        # dotenv が無い/ファイルが無い等は無視してよい
-        return
+    ローカル配布版では外部サービス用の環境変数を使わない。既存の起動境界から
+    呼ばれても副作用がないように、空実装として残す。
+    """
 
 
-def supabase_url() -> str:
-    return os.environ.get("SUPABASE_URL", "")
+def app_base_dir() -> Path:
+    """書き込み可能なアプリ配置ディレクトリを返す。
+
+    PyInstaller で exe 化された場合は exe の隣、開発時はリポジトリルートを使う。
+    """
+
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return REPO_ROOT
 
 
-def supabase_service_role_key() -> str:
-    return os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+def local_data_dir() -> Path:
+    return app_base_dir() / LOCAL_DATA_DIRNAME
 
-# --- Supabase ----------------------------------------------------------------
-#
-# NOTE: backend は DB を Supabase Postgres に移行したため、SQLite のパスは保持しない。
-# これらは起動時に環境変数から与える（ローカル .env / デプロイ環境の設定）。
-#
-# 互換のため名前は残す（値は import 時点で固定しない）。
-SUPABASE_URL: str = ""
-SUPABASE_SERVICE_ROLE_KEY: str = ""
+
+def local_cache_dir() -> Path:
+    return local_data_dir() / LOCAL_CACHE_DIRNAME
+
+
+def sqlite_db_path() -> Path:
+    return local_data_dir() / LOCAL_DB_FILENAME
+
+
+def frontend_dist_dir() -> Path:
+    """配布zip同梱の `frontend/dist` を探す。
+
+    zip配布では exe の隣に `frontend/dist` を置く。開発時は同じ関数で
+    リポジトリ内の `frontend/dist` を参照する。
+    """
+
+    return app_base_dir() / "frontend" / "dist"

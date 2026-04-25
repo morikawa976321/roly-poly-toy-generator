@@ -27,13 +27,13 @@
 実装上の含意（最小）:
 - 「2D断面（片側）」→「回転体として3D化」が基本パイプライン。
 
-### 3) 永続化は Supabase Postgres
-- メタデータ（gene / metrics / feasibility / created_at）は **Supabase Postgres** に保存する。
+### 3) 永続化はローカル SQLite
+- メタデータ（gene / metrics / feasibility / created_at）は **exe の隣の `data/app.db`** に保存する。
 - 大きい派生物（断面 SVG / 3D 表示メッシュ / STL）は **フロント側で gene から生成**し、DB には置かない。
 
 実装上の含意（最小）:
 - バックエンドは **アセット配信をしない**（`/thumb.svg` や `/model.glb` を持たない）。
-- 認証・マルチテナント等は現段階では非対象（サービスロール鍵をサーバー側で利用）。
+- 認証・マルチテナント等は現段階では非対象（ローカルアプリとして単一ユーザー運用）。
 
 補足（実装の一貫性）:
 - backend には派生アセット生成（SVG/mesh/export）を置かず、**frontend の `frontend/src/derive/*` を唯一の生成経路**とする。
@@ -47,18 +47,19 @@
 - **詳細表示**: 3Dモデルのインタフェースを提供する（回転・拡大縮小など）。
 
 ## 技術選定（プロトタイプ）
-**方針**: 最速プロトタイプとして、以下の構成を採用する。
+**方針**: Windows 向けローカル配布アプリとして、以下の構成を採用する。
 
 - **Backend**: Python + **FastAPI**
   - gene 生成・評価（metrics / feasibility）と DB 保存を担当
   - `design_id`（再現性ID）の導出を担当
+  - ローカル SQLite とビルド済みフロント配信を担当
 - **Frontend**: TypeScript + React（**Vite**）
   - ギャラリー（一覧・詳細）UI、探索操作、状態表示を担当
 - **3D Viewer**: **three.js**（必要なら react-three-fiber を利用）
   - 詳細画面での3D操作表示を担当
 
 最小の接続ルール:
-- フロント/バック間は **HTTP API** で接続する。
+- フロント/バック間は **localhost の HTTP API** で接続する。
 - 一覧用の断面サムネ・詳細の 3D 表示・STL 出力は **フロントが gene から生成**する。
 
 ## STL生成（現時点の方針）
@@ -95,7 +96,7 @@
 
 ### 生成・保存
 - 1 バッチ = 12 個（`batch_size = 12`）。
-- 永続化: Supabase Postgres（gene / metrics / feasibility / created_at）。
+- 永続化: ローカル SQLite（gene / metrics / feasibility / created_at）。
 - 全生成物を保存（選抜なし）。派生アセットは保存しない（必要ならクライアントで再生成）。
 
 ### 処理方式

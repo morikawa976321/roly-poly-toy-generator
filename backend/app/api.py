@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, HTTPException, Query
+import asyncio
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 
 from .config import BATCH_SIZE
 from .gene import breed_gene_with_feasibility, sample_gene_with_feasibility
@@ -34,6 +36,21 @@ from .storage import (
 
 
 router = APIRouter(prefix="/api")
+
+
+async def _shutdown_after_response(request: Request) -> None:
+    await asyncio.sleep(0.1)
+    shutdown = getattr(request.app.state, "request_shutdown", None)
+    if shutdown is not None:
+        shutdown()
+
+
+@router.post("/app/exit")
+def exit_app(request: Request, background_tasks: BackgroundTasks) -> dict[str, str]:
+    """ローカル配布版の終了ボタンから呼ばれる終了API。"""
+
+    background_tasks.add_task(_shutdown_after_response, request)
+    return {"status": "shutting_down"}
 
 
 @router.post("/designs/generate", response_model=GenerateResponse)

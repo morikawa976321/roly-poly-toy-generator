@@ -6,9 +6,9 @@ A generator and curated gallery of physically stable, self-righting 3D models.
 
 ## 構成
 
-- `backend/` — Python + FastAPI。gene の生成と metrics 計算、Supabase Postgres への保存を担当。
+- `backend/` — Python + FastAPI。gene の生成、metrics 計算、ローカル SQLite への保存、ビルド済みフロント配信を担当。
 - `frontend/` — Vite + React + TypeScript + Tailwind v4 + react-three-fiber。一覧 (SVG サムネ) と 詳細 (3D ビュー) を提供。
-- `supabase/` — DB スキーマ（マイグレーション SQL）。
+- `data/` — ローカル実行時の SQLite DB と生成キャッシュ（git 管理外）。
 
 ## 必要なツール
 
@@ -27,32 +27,10 @@ npm install
 npm --prefix frontend install
 ```
 
-## 環境変数（Supabase）
+## ローカルデータ
 
-ルートの `.env.example` を参考に `.env` を作成し、Supabase の値を設定する。
-
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-開発では `.env.local` を使ってもよい（バックエンドが自動で読み込む）。
-
-## localSupabase（開発）
-
-Supabase CLI を使ってローカルに Supabase を立ち上げ、そこへ接続して開発できる。
-
-```powershell
-# 初回または起動
-npm run supabase:start
-
-# DB を migrations に合わせて作り直す（supabase/migrations を適用）
-npm run supabase:reset
-```
-
-`npm run supabase:start` の出力に **API URL** と **service_role key** が表示されるので、
-それを `.env` に設定する。
-
-- `SUPABASE_URL`: 通常 `http://localhost:54321`
-- `SUPABASE_SERVICE_ROLE_KEY`: start 出力の service_role key
+外部サービスは使わない。DB は起動時に `data/app.db` として自動作成される。
+zip 配布版では **exe の隣の `data/`** に保存されるため、書き込み可能な場所に展開して実行する。
 
 ## 起動
 
@@ -78,7 +56,7 @@ npm run dev
 
 ### 停止・トラブルシュート
 
-終了はターミナルで `Ctrl+C`。`npm run dev` はオーケストレータが `SIGINT` を拾って backend / frontend のプロセスツリーを `taskkill /T /F` で落とすので、`uvicorn --reload` の子プロセスまでまとめて終了する。
+開発時の終了はターミナルで `Ctrl+C`。`npm run dev` はオーケストレータが `SIGINT` を拾って backend / frontend のプロセスツリーを `taskkill /T /F` で落とすので、`uvicorn --reload` の子プロセスまでまとめて終了する。
 
 ターミナルを強制終了して `:8000` や `:5173` を握ったままの孤児が残った場合は、次で回収できる。
 
@@ -95,3 +73,37 @@ npm run stop
 | GET    | `/api/designs/{id}`                     | 詳細（gene + metrics）        |
 
 OpenAPI は `http://localhost:8000/docs` で参照可能。
+
+## Windows zip 配布
+
+Windows 向けの配布物は、ビルド済みフロント (`frontend/dist`) をフォルダとして同梱し、PyInstaller で作った exe からローカル FastAPI を起動する。
+
+```powershell
+npm run package:windows
+```
+
+生成物:
+
+- `build/release/roly-poly-toy-generator-windows.zip`
+- zip 内の `roly-poly-toy-generator/roly-poly-toy-generator.exe`
+- zip 内の `roly-poly-toy-generator/frontend/dist/`
+- zip 内の `roly-poly-toy-generator/data/`
+
+利用者は zip を書き込み可能な場所（例: Desktop や Documents 配下）に展開し、`roly-poly-toy-generator.exe` をダブルクリックする。
+
+配布版の挙動:
+
+- 起動時に空きポートを自動選択し、既定ブラウザで `http://127.0.0.1:<port>/` を開く。
+- Web UI 右上の **終了** ボタンでローカルサーバを停止する。
+- ブラウザを閉じたまま放置した場合も、10分アクセスが無ければ自動停止する。
+- SQLite DB は exe の隣の `data/app.db` に保存される。
+
+### 配布版スモークテスト
+
+1. `npm run package:windows` が成功し、zip が生成される。
+2. zip を別フォルダに展開し、`roly-poly-toy-generator.exe` をダブルクリックする。
+3. ブラウザが自動で開き、ギャラリーが表示される。
+4. 「12個追加生成」でデザインが作成され、一覧・詳細・STL出力が動く。
+5. UI右上の「終了」をクリックすると、exeプロセスが終了する。
+6. 再起動後も前回のデザインが `data/app.db` から復元される。
+7. ブラウザを閉じて10分放置した場合、exeプロセスが自動終了する。
