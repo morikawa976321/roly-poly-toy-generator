@@ -213,11 +213,9 @@ __marimo__/
 node_modules/
 frontend/dist/
 frontend/.vite/
+build/
+*.spec
 
 # Runtime data (local app state + generated assets)
 data/
 
-# Supabase CLI local state
-supabase/.temp/
-supabase/.branches/
-supabase/snippets/

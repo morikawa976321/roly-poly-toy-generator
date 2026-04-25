@@ -5,6 +5,29 @@
     "version": "0.0.1"
   },
   "paths": {
+    "/api/app/exit": {
+      "post": {
+        "summary": "Exit App",
+        "description": "ローカル配布版の終了ボタンから呼ばれる終了API。",
+        "operationId": "exit_app_api_app_exit_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Exit App Api App Exit Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/designs/generate": {
       "post": {
         "summary": "Generate Designs",
@@ -173,6 +196,59 @@
                   },
                   "type": "object",
                   "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Spa Root",
+        "operationId": "spa_root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/{path}": {
+      "get": {
+        "summary": "Spa Fallback",
+        "operationId": "spa_fallback__path__get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }

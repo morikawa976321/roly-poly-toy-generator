@@ -1,60 +1,66 @@
-"""デザインの永続化レイヤ（Supabase Postgres）。
-
-- メタデータ（gene / metrics / feasibility / created_at）は Supabase の `public.designs` に格納する。
-- 大きい派生物（thumb.svg / 3D メッシュ / STL）はフロント側で gene から生成する。
-"""
+"""デザインの永続化レイヤ（ローカル SQLite）。"""
 
 from __future__ import annotations
 
-import logging
+import json
+import sqlite3
+from contextlib import contextmanager
+from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Any, List, Optional, Tuple
+from typing import Any, Iterator, List, Optional, Tuple
 
-from supabase import Client, create_client
-
-from .config import supabase_service_role_key, supabase_url
+from .config import local_data_dir, sqlite_db_path
 from .models import DesignSummary, Gene, Metrics
 
 
 TABLE = "designs"
-logger = logging.getLogger(__name__)
 
 
-def _is_unique_violation(exc: Exception) -> bool:
-    """Postgres の unique_violation (SQLSTATE 23505) 相当かを雑に判定する。
-
-    Supabase/PostgREST の Python クライアントが返す例外型/属性はバージョンで揺れるため、
-    ここでは「見つけやすいヒント」を複合して判定する（安全側: 判定できなければ握らない）。
-    """
-
-    code = getattr(exc, "code", None)
-    if code == "23505":
-        return True
-
-    # 例: details / message / error dict などに 23505 が含まれるケース
-    for attr in ("details", "message", "error", "args"):
-        try:
-            val = getattr(exc, attr, None)
-            if val is None:
-                continue
-            if "23505" in str(val):
-                return True
-        except Exception:
-            continue
-
-    s = str(exc).lower()
-    return ("duplicate key value" in s) or ("unique constraint" in s)
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 @lru_cache(maxsize=1)
-def _client() -> Client:
-    url = supabase_url()
-    key = supabase_service_role_key()
-    if not url:
-        raise RuntimeError("SUPABASE_URL is not set")
-    if not key:
-        raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is not set")
-    return create_client(url, key)
+def init_db() -> None:
+    """SQLite DB とスキーマを初期化する。"""
+
+    local_data_dir().mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(sqlite_db_path()) as con:
+        con.execute("PRAGMA journal_mode=WAL")
+        con.execute(
+            f"""
+            CREATE TABLE IF NOT EXISTS {TABLE} (
+                design_id TEXT PRIMARY KEY,
+                gene_json TEXT NOT NULL,
+                volume REAL NOT NULL,
+                height REAL NOT NULL,
+                max_width REAL NOT NULL,
+                centroid_z REAL NOT NULL,
+                z_cog_suggested REAL,
+                bottom_curvature_radius REAL,
+                z_cog_max REAL,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        con.execute(
+            f"""
+            CREATE INDEX IF NOT EXISTS designs_created_at_idx
+            ON {TABLE} (created_at DESC, design_id DESC)
+            """
+        )
+
+
+@contextmanager
+def _connect() -> Iterator[sqlite3.Connection]:
+    init_db()
+    con = sqlite3.connect(sqlite_db_path())
+    con.row_factory = sqlite3.Row
+    try:
+        yield con
+        con.commit()
+    finally:
+        con.close()
 
 
 def _row_to_metrics(row: dict[str, Any]) -> Metrics:
@@ -70,15 +76,12 @@ def _row_to_metrics(row: dict[str, Any]) -> Metrics:
 
 
 def exists(design_id: str) -> bool:
-    res = (
-        _client()
-        .table(TABLE)
-        .select("design_id")
-        .eq("design_id", design_id)
-        .limit(1)
-        .execute()
-    )
-    return bool(getattr(res, "data", None))
+    with _connect() as con:
+        row = con.execute(
+            f"SELECT 1 FROM {TABLE} WHERE design_id = ? LIMIT 1",
+            (design_id,),
+        ).fetchone()
+    return row is not None
 
 
 def upsert_design(
@@ -86,28 +89,30 @@ def upsert_design(
     gene: Gene,
     metrics: Metrics,
 ) -> DesignSummary:
-    payload = {
-        "design_id": design_id,
-        "gene": gene.model_dump(mode="json"),
-        "volume": float(metrics.volume),
-        "height": float(metrics.height),
-        "max_width": float(metrics.max_width),
-        "centroid_z": float(metrics.centroid_z),
-        "z_cog_suggested": metrics.z_cog_suggested,
-        "bottom_curvature_radius": metrics.bottom_curvature_radius,
-        "z_cog_max": metrics.z_cog_max,
-    }
+    payload = (
+        design_id,
+        json.dumps(gene.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":")),
+        float(metrics.volume),
+        float(metrics.height),
+        float(metrics.max_width),
+        float(metrics.centroid_z),
+        metrics.z_cog_suggested,
+        metrics.bottom_curvature_radius,
+        metrics.z_cog_max,
+        _now_iso(),
+    )
 
-    # 既存IDは上書きしない（Supabase/PostgREST 側の unique 制約により insert が失敗したら無視する）。
-    try:
-        _client().table(TABLE).insert(payload).execute()
-    except Exception as e:
-        # 期待される失敗: 既に同じ design_id が存在する（unique_violation）
-        if _is_unique_violation(e):
-            pass
-        else:
-            logger.exception("Failed to insert design_id=%s into %s", design_id, TABLE)
-            raise
+    # 既存IDは上書きしない。SQLite の INSERT OR IGNORE で冪等にする。
+    with _connect() as con:
+        con.execute(
+            f"""
+            INSERT OR IGNORE INTO {TABLE}
+              (design_id, gene_json, volume, height, max_width, centroid_z,
+               z_cog_suggested, bottom_curvature_radius, z_cog_max, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            payload,
+        )
 
     found = get_design(design_id)
     if not found:
@@ -117,28 +122,25 @@ def upsert_design(
 
 
 def list_designs(limit: int = 100, offset: int = 0) -> Tuple[List[DesignSummary], int]:
-    to_ = offset + limit - 1
-    res = (
-        _client()
-        .table(TABLE)
-        .select(
-            "design_id, gene, volume, height, max_width, centroid_z, z_cog_suggested, bottom_curvature_radius, z_cog_max, created_at",
-            count="exact",
-        )
-        .order("created_at", desc=True)
-        .order("design_id", desc=True)
-        .range(offset, to_)
-        .execute()
-    )
-    total = int(getattr(res, "count", 0) or 0)
-    rows = getattr(res, "data", None) or []
+    with _connect() as con:
+        total = int(con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0])
+        rows = con.execute(
+            f"""
+            SELECT design_id, gene_json, volume, height, max_width, centroid_z,
+                   z_cog_suggested, bottom_curvature_radius, z_cog_max, created_at
+            FROM {TABLE}
+            ORDER BY created_at DESC, design_id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
     out: List[DesignSummary] = []
     for r in rows:
         out.append(
             DesignSummary(
                 design_id=r["design_id"],
-                gene=Gene.model_validate(r["gene"]),
-                metrics=_row_to_metrics(r),
+                gene=Gene.model_validate(json.loads(r["gene_json"])),
+                metrics=_row_to_metrics(dict(r)),
                 created_at=r["created_at"],
             )
         )
@@ -149,49 +151,46 @@ def list_designs_with_genes(
     limit: int = 100, offset: int = 0
 ) -> Tuple[List[Tuple[str, Gene, str]], int]:
     """gene 付きで designs を列挙する（フロントで派生物生成したい用途）。"""
-    to_ = offset + limit - 1
-    res = (
-        _client()
-        .table(TABLE)
-        .select("design_id, gene, created_at", count="exact")
-        .order("created_at", desc=True)
-        .order("design_id", desc=True)
-        .range(offset, to_)
-        .execute()
-    )
-    total = int(getattr(res, "count", 0) or 0)
-    rows = getattr(res, "data", None) or []
+    with _connect() as con:
+        total = int(con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0])
+        rows = con.execute(
+            f"""
+            SELECT design_id, gene_json, created_at
+            FROM {TABLE}
+            ORDER BY created_at DESC, design_id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset),
+        ).fetchall()
     out: List[Tuple[str, Gene, str]] = []
     for r in rows:
-        gene = Gene.model_validate(r["gene"])
+        gene = Gene.model_validate(json.loads(r["gene_json"]))
         out.append((r["design_id"], gene, r["created_at"]))
     return out, total
 
 
 def get_design(design_id: str) -> Optional[Tuple[Gene, Metrics, str]]:
-    res = (
-        _client()
-        .table(TABLE)
-        .select(
-            "gene, volume, height, max_width, centroid_z, z_cog_suggested, bottom_curvature_radius, z_cog_max, created_at"
-        )
-        .eq("design_id", design_id)
-        .limit(1)
-        .execute()
-    )
-    rows = getattr(res, "data", None) or []
-    if not rows:
+    with _connect() as con:
+        row = con.execute(
+            f"""
+            SELECT gene_json, volume, height, max_width, centroid_z,
+                   z_cog_suggested, bottom_curvature_radius, z_cog_max, created_at
+            FROM {TABLE}
+            WHERE design_id = ?
+            LIMIT 1
+            """,
+            (design_id,),
+        ).fetchone()
+    if row is None:
         return None
-    row = rows[0]
-    gene = Gene.model_validate(row["gene"])
-    metrics = _row_to_metrics(row)
+    gene = Gene.model_validate(json.loads(row["gene_json"]))
+    metrics = _row_to_metrics(dict(row))
     return gene, metrics, row["created_at"]
 
 
 def delete_all_designs() -> int:
     """全デザインを DB から削除する。"""
-    count_res = _client().table(TABLE).select("design_id", count="exact").execute()
-    count = int(getattr(count_res, "count", 0) or 0)
-    # PostgREST はフィルタ無し DELETE を許さないことがあるため、常に true な条件を付ける
-    _client().table(TABLE).delete().neq("design_id", "").execute()
+    with _connect() as con:
+        count = int(con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0])
+        con.execute(f"DELETE FROM {TABLE}")
     return count
