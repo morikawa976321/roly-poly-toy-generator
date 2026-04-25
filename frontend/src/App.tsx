@@ -1,9 +1,21 @@
 import { Link, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
 import GalleryPage from "./pages/GalleryPage";
 import DetailPage from "./pages/DetailPage";
 import { exitApp } from "./api";
 
 export default function App() {
+  useEffect(() => {
+    // ブラウザが開かれている間は定期的に /health を叩き、アイドル自動終了を防ぐ。
+    // タブ/ウィンドウを閉じれば interval も停止するため、「放置で自動終了」と両立できる。
+    const id = window.setInterval(() => {
+      void fetch("/health").catch(() => {});
+    }, 120_000);
+    return () => {
+      window.clearInterval(id);
+    };
+  }, []);
+
   const onExit = async () => {
     try {
       await exitApp();
