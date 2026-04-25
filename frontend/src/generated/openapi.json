@@ -1,0 +1,488 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "roly-poly-toy-generator",
+    "version": "0.0.1"
+  },
+  "paths": {
+    "/api/designs/generate": {
+      "post": {
+        "summary": "Generate Designs",
+        "operationId": "generate_designs_api_designs_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/GenerateRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/designs": {
+      "get": {
+        "summary": "List Designs Endpoint",
+        "operationId": "list_designs_endpoint_api_designs_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete All Designs Endpoint",
+        "operationId": "delete_all_designs_endpoint_api_designs_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAllResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/designs/{design_id}": {
+      "get": {
+        "summary": "Get Design Endpoint",
+        "operationId": "get_design_endpoint_api_designs__design_id__get",
+        "parameters": [
+          {
+            "name": "design_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Design Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DeleteAllResponse": {
+        "properties": {
+          "deleted": {
+            "type": "integer",
+            "title": "Deleted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted"
+        ],
+        "title": "DeleteAllResponse"
+      },
+      "DesignDetail": {
+        "properties": {
+          "design_id": {
+            "type": "string",
+            "title": "Design Id"
+          },
+          "gene": {
+            "$ref": "#/components/schemas/Gene"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "design_id",
+          "gene",
+          "metrics",
+          "created_at"
+        ],
+        "title": "DesignDetail",
+        "description": "詳細ビュー向けのフル情報。"
+      },
+      "DesignSummary": {
+        "properties": {
+          "design_id": {
+            "type": "string",
+            "title": "Design Id"
+          },
+          "gene": {
+            "$ref": "#/components/schemas/Gene"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/Metrics"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "design_id",
+          "gene",
+          "metrics",
+          "created_at"
+        ],
+        "title": "DesignSummary",
+        "description": "一覧ビュー向けの最小情報。"
+      },
+      "Gene": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "N": {
+            "type": "integer",
+            "title": "N"
+          },
+          "height": {
+            "type": "number",
+            "title": "Height"
+          },
+          "bottom_radius": {
+            "type": "number",
+            "title": "Bottom Radius"
+          },
+          "radii": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "Radii"
+          },
+          "z_warp": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Warp"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "N",
+          "height",
+          "bottom_radius",
+          "radii"
+        ],
+        "title": "Gene",
+        "description": "デザインの形状を正規化した表現。\n\n形状は、[0, height] 上の ``N`` 個の制御点 (z_i, radii[i]) による\n折れ線/スプライン r(z) プロファイルを z 軸回りに回転させた回転体として定義する。\nz_i の配置は ``z_warp`` で決まる:\n\n    z_i = height · (i / (N-1)) ** z_warp\n\n- ``z_warp=1.0`` ないし ``None``: 等間隔（v1 および旧 v2）\n- ``z_warp=2.0``: 二乗ワープ。z=0 付近にノードが密に集まり、球キャップの\n   √z 型特異点（極で傾き無限大）を忠実に再現できる。v2 では既定値。\n\nバージョン:\n- v1（旧）: radii[0] == bottom_radius（> 0、底は平円盤）、radii[-1] == 0、\n  z_warp は未設定（None → 等間隔扱い）。\n- v2（現行、GENE_VERSION=2）: radii[0] == 0（底は球キャップの極点）、\n  radii[-1] == rt（上端の丸め半径）、球キャップ+5次テーパのパラメトリック族\n  から生成され、θ_max=75° まで自己復元可能な形状のみ。z_warp=2.0。\n\n両バージョンとも radii は単峰（ある peak index までは単調増加、以降は単調減少）。"
+      },
+      "GenerateRequest": {
+        "properties": {
+          "n": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 200.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N"
+          },
+          "parent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "maxItems": 4
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Ids"
+          }
+        },
+        "type": "object",
+        "title": "GenerateRequest"
+      },
+      "GenerateResponse": {
+        "properties": {
+          "designs": {
+            "items": {
+              "$ref": "#/components/schemas/DesignSummary"
+            },
+            "type": "array",
+            "title": "Designs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "designs"
+        ],
+        "title": "GenerateResponse"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ListResponse": {
+        "properties": {
+          "designs": {
+            "items": {
+              "$ref": "#/components/schemas/DesignSummary"
+            },
+            "type": "array",
+            "title": "Designs"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "designs",
+          "total"
+        ],
+        "title": "ListResponse"
+      },
+      "Metrics": {
+        "properties": {
+          "volume": {
+            "type": "number",
+            "title": "Volume"
+          },
+          "height": {
+            "type": "number",
+            "title": "Height"
+          },
+          "max_width": {
+            "type": "number",
+            "title": "Max Width"
+          },
+          "centroid_z": {
+            "type": "number",
+            "title": "Centroid Z"
+          },
+          "z_cog_suggested": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Cog Suggested"
+          },
+          "bottom_curvature_radius": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bottom Curvature Radius"
+          },
+          "z_cog_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Z Cog Max"
+          }
+        },
+        "type": "object",
+        "required": [
+          "volume",
+          "height",
+          "max_width",
+          "centroid_z"
+        ],
+        "title": "Metrics"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

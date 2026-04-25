@@ -1,41 +1,12 @@
-export type Metrics = {
-  volume: number;
-  height: number;
-  max_width: number;
-  centroid_z: number;
-  z_cog_suggested?: number | null;
-  bottom_curvature_radius?: number | null;
-  z_cog_max?: number | null;
-};
+// OpenAPI を単一ソースにし、型は生成物から参照する。
+// 既存 import の互換のため、このファイルは再export専用にしている。
+import type { components } from "./generated/api-schema";
 
-export type DesignSummary = {
-  design_id: string;
-  gene: Gene;
-  metrics: Metrics;
-  created_at: string;
-};
+type Schemas = components["schemas"];
 
-export type Gene = {
-  version: number;
-  N: number;
-  height: number;
-  bottom_radius: number;
-  radii: number[];
-  z_warp?: number | null;
-};
-
-export type DesignDetail = {
-  design_id: string;
-  gene: Gene;
-  metrics: Metrics;
-  created_at: string;
-};
-
-export type ListResponse = {
-  designs: DesignSummary[];
-  total: number;
-};
-
-export type GenerateResponse = {
-  designs: DesignSummary[];
-};
+export type Gene = Schemas["Gene"];
+export type Metrics = Schemas["Metrics"];
+export type DesignSummary = Schemas["DesignSummary"];
+export type DesignDetail = Schemas["DesignDetail"];
+export type ListResponse = Schemas["ListResponse"];
+export type GenerateResponse = Schemas["GenerateResponse"];

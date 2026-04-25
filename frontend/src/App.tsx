@@ -10,9 +10,6 @@ export default function App() {
           <Link to="/" className="text-lg font-semibold tracking-tight">
             Roly-Poly Toy Generator
           </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-slate-500">local pre-prototype</span>
-          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">

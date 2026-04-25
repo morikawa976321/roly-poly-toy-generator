@@ -35,7 +35,7 @@ from .config import (
     TILT_MAX_DEG,
 )
 from .models import Gene
-from .physics import Feasibility, feasibility_from_profile
+from .physics import Feasibility, feasibility_from_profile, rolypoly_feasibility
 from .shape import (
     profile_to_radii,
     sample_shape_params,
@@ -169,7 +169,7 @@ def breed_gene_with_feasibility(
 
     1) まず `sample_gene_with_feasibility()` で必ず成立する個体を生成（基底個体）
     2) 親の radii/height の統計（平均形状）で基底個体を軽く“モーフ”し、親の特徴を混ぜる
-    3) feasibility は基底個体生成時の値を返す（モーフは jitter と同程度の軽微変更に留める）
+    3) 子 gene に対して feasibility を再評価し、成立する個体のみ返す
 
     という方針で「親が影響するGA的生成」を実現する。
     """
@@ -177,42 +177,56 @@ def breed_gene_with_feasibility(
         raise ValueError("parents must be non-empty")
 
     rng = np.random.default_rng(seed)
-    base_seed = int(rng.integers(0, np.iinfo(np.int64).max))
-    gene, feas = sample_gene_with_feasibility(seed=base_seed, max_retry=max_retry)
-
     ps = list(parents)
+
     # 親の平均形状（radii/height）を作る。N は揃っている前提（現行v2）。
-    n = int(gene.N)
     parent_r = np.mean([np.asarray(p.radii, dtype=float) for p in ps], axis=0)
     parent_h = float(np.mean([float(p.height) for p in ps]))
 
-    # 子に混ぜる割合（小さめにして feasibility を壊しにくくする）
-    mix = float(rng.uniform(0.08, 0.22))
+    last_feas: Optional[Feasibility] = None
+    for _attempt in range(max_retry):
+        base_seed = int(rng.integers(0, np.iinfo(np.int64).max))
+        gene, _feas_base = sample_gene_with_feasibility(seed=base_seed, max_retry=max_retry)
 
-    child_r = np.asarray(gene.radii, dtype=float)
-    # 親のスケールを合わせる（ピーク半径を揃える）。親のピークが0ならスキップ。
-    pr_peak = float(np.max(parent_r))
-    cr_peak = float(np.max(child_r))
-    if pr_peak > 1e-9 and cr_peak > 1e-9:
-        parent_r = parent_r * (cr_peak / pr_peak)
+        # 子に混ぜる割合（小さめにして feasibility を壊しにくくする）
+        mix = float(rng.uniform(0.08, 0.22))
 
-    blended = (1.0 - mix) * child_r + mix * parent_r
-    peak = int(np.argmax(blended))
-    blended_list = _repair_unimodal(blended.tolist(), peak, r0=0.0, r_end=None, eps=0.0)
-    # 最後にごく小さな jitter（見た目の個体差）。random生成より弱め。
-    blended_list = _apply_radial_jitter(blended_list, rng, amp=float(JITTER_AMP * 0.35))
+        child_r = np.asarray(gene.radii, dtype=float)
+        parent_r_scaled = parent_r
+        # 親のスケールを合わせる（ピーク半径を揃える）。親のピークが0ならスキップ。
+        pr_peak = float(np.max(parent_r_scaled))
+        cr_peak = float(np.max(child_r))
+        if pr_peak > 1e-9 and cr_peak > 1e-9:
+            parent_r_scaled = parent_r_scaled * (cr_peak / pr_peak)
 
-    # height も少しだけ親に寄せる
-    h_mix = float(rng.uniform(0.05, 0.18))
-    child_h = (1.0 - h_mix) * float(gene.height) + h_mix * parent_h
+        blended = (1.0 - mix) * child_r + mix * parent_r_scaled
+        peak = int(np.argmax(blended))
+        blended_list = _repair_unimodal(blended.tolist(), peak, r0=0.0, r_end=None, eps=0.0)
+        # 最後にごく小さな jitter（見た目の個体差）。random生成より弱め。
+        blended_list = _apply_radial_jitter(blended_list, rng, amp=float(JITTER_AMP * 0.35))
 
-    child = gene.model_copy(update={
-        "height": float(child_h),
-        "radii": blended_list,
-        "bottom_radius": 0.0,
-        "z_warp": 2.0,
-    })
-    return child, feas
+        # height も少しだけ親に寄せる
+        h_mix = float(rng.uniform(0.05, 0.18))
+        child_h = (1.0 - h_mix) * float(gene.height) + h_mix * parent_h
+
+        child = gene.model_copy(
+            update={
+                "height": float(child_h),
+                "radii": blended_list,
+                "bottom_radius": 0.0,
+                "z_warp": 2.0,
+            }
+        )
+
+        feas_child = rolypoly_feasibility(child)
+        last_feas = feas_child
+        if feas_child.is_feasible:
+            return child, feas_child
+
+    raise RuntimeError(
+        f"Failed to breed a feasible gene after {max_retry} retries "
+        f"(last: {last_feas})"
+    )
 
 
 def sample_gene_with_feasibility(

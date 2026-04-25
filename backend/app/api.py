@@ -14,8 +14,8 @@ from fastapi import APIRouter, HTTPException, Query
 
 from .config import BATCH_SIZE
 from .gene import breed_gene_with_feasibility, sample_gene_with_feasibility
-from .geometry import compute_metrics
 from .identify import design_id_for
+from .metrics import compute_metrics
 from .models import (
     DesignDetail,
     DesignSummary,
@@ -70,6 +70,9 @@ def generate_designs(payload: GenerateRequest | None = None) -> GenerateResponse
             gene, feasibility = breed_gene_with_feasibility(parents)
         else:
             gene, feasibility = sample_gene_with_feasibility()
+        # 安全弁: 生成関数のバグ等で不成立が混入しても保存しない。
+        if not feasibility.is_feasible:
+            continue
         did = design_id_for(gene)
         if exists(did):
             continue
