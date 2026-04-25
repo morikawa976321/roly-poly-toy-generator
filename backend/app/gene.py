@@ -189,7 +189,7 @@ def breed_gene_with_feasibility(
         gene, _feas_base = sample_gene_with_feasibility(seed=base_seed, max_retry=max_retry)
 
         # 子に混ぜる割合（小さめにして feasibility を壊しにくくする）
-        mix = float(rng.uniform(0.08, 0.22))
+        mix = float(rng.uniform(0.2, 0.4))
 
         child_r = np.asarray(gene.radii, dtype=float)
         parent_r_scaled = parent_r
