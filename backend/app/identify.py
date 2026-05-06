@@ -1,6 +1,6 @@
 """gene から decisive（決定的）に design_id を導出する。
 
-ルール（DESIGN_DECISIONS.md 参照）:
+ルール（README.md 参照）:
 - gene を正規形の JSON 文字列にする（キーをソート、浮動小数は
   ``GENE_FLOAT_DECIMALS`` 桁で丸める）。
 - SHA-256 でハッシュし、先頭 ``DESIGN_ID_HEX_LENGTH`` 桁の 16 進を取る。

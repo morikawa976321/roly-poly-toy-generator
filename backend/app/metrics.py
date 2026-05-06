@@ -1,8 +1,8 @@
 """Metrics computation from gene.
 
 This module is intentionally backend-only and limited to numeric metrics
-needed for storage / API responses. Asset generation (SVG/mesh/STL/GLB) is
-handled in the frontend per DESIGN_DECISIONS.md.
+needed for storage / API responses. Asset generation (SVG/mesh/STL) is
+handled in the frontend per README.md.
 """
 
 from __future__ import annotations
