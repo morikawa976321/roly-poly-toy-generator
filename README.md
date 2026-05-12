@@ -116,7 +116,7 @@ npm run package:windows
 
 1. **再現性とID** — 同じ形状には同じ ID を与える。gene を正規化 JSON（キー順固定、float 小数第4位丸め）にシリアライズし、SHA-256 の先頭 16 hex 文字を `design_id` とする（`backend/app/identify.py`）。ID だけで形状を完全に再現できる。
 2. **回転対称（鉛直軸）** — モデルは Z 軸に対して回転対称。生成・評価の対象は断面片側の半径関数 `r(z)` であり、「2D 断面 → 回転体として 3D 化」が基本パイプライン。
-3. **永続化はローカル SQLite** — メタデータ（gene / metrics / feasibility / created_at）は `data/app.db` に保存。派生アセット（SVG サムネ / 3D メッシュ / STL）は DB に置かず、フロントエンドが gene からオンデマンド生成する。Backend はアセット配信をしない。
+3. **永続化はローカル SQLite** — メタデータ（gene / metrics / feasibility / created_at）は `data/app.db` に保存。派生アセット（SVG サムネ / 3D メッシュ / STL / STEP）は DB に置かず、フロントエンドが gene からオンデマンド生成する。Backend はアセット配信をしない。
 4. **プロトタイプ最速完成 > きれいな設計 > 高機能化** — 不確実な設計検討より動く最小構成を優先する。
 5. **ローカル完結** — 認証・マルチテナント・外部サービスは非対象。単一ユーザーのローカルアプリとして運用する。
 
@@ -142,7 +142,7 @@ npm run package:windows
 
 - **サムネイル** (`thumbnailSvg.ts`): SVG。両側ミラーした実断面 + 重心の赤十字マーカー + z_cog_max の青十字マーカー。
 - **3D 表示** (`mesh.ts`): カスタム `revolveWatertightGeometry` で watertight な回転体メッシュを生成し、react-three-fiber でブラウザ上に表示。
-- **STL** (`stlExporter.ts`): three.js の `STLExporter` によりブラウザ上で生成しダウンロード。
+- **STL / STEP** (`stlExporter.ts` / `stepExporter.ts`): three.js の `STLExporter` や opencascade.js によりブラウザ上で生成しダウンロード。
 
 ### 生成・保存
 
@@ -154,7 +154,7 @@ npm run package:windows
 ### UI
 
 - **一覧 (Gallery)**: 断面 SVG サムネをグリッド表示。デザインを最大 4 つ選択して「選択から 12 個生成」が可能。一括削除機能あり。
-- **詳細 (Detail)**: 3D モデルの回転・拡大縮小操作、断面 SVG、metrics パネル、STL ダウンロード。
+- **詳細 (Detail)**: 3D モデルの回転・拡大縮小操作、断面 SVG、metrics パネル、STL/STEP ダウンロード。
 
 ### 技術スタック
 
@@ -226,6 +226,7 @@ roly-poly-toy-generator/
 │       │   ├── mesh.test.ts
 │       │   ├── smoothing.ts     # gene の radii → 密プロファイル補間（TS 版）
 │       │   ├── smoothing.test.ts
+│       │   ├── stepExporter.ts  # gene → STEP Blob（opencascade.js）
 │       │   ├── stlExporter.ts   # メッシュ → STL Blob（three.js STLExporter）
 │       │   └── thumbnailSvg.ts  # gene → 断面 SVG（両側ミラー + 重心マーカー）
 │       ├── generated/
