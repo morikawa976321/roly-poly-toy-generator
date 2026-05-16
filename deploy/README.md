@@ -17,6 +17,7 @@
 ```bash
 cd deploy
 npm install
+npm --prefix ../frontend install   # @core が参照する frontend の型・依存
 npm run dev
 ```
 
@@ -26,6 +27,8 @@ npm run dev
 2. **Root Directory**: `deploy`
 3. Framework Preset: Vite（`vercel.json` あり）
 4. デプロイ
+
+`@core` は `../frontend/src` を参照するため、ビルド時に `frontend` の `npm ci` も実行します（`vercel.json` の `installCommand`）。
 
 ## デザインデータの更新
 
