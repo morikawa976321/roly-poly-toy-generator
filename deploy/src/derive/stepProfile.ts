@@ -1,4 +1,4 @@
-/** Auto-synced from frontend/src/derive/stepProfile.ts — npm run sync-core */
+/** Auto-synced from frontend/src/derive — npm run sync-core */
 
 /**
  * STEP エクスポート用プロファイル点列の間引きと B-spline エッジ生成。

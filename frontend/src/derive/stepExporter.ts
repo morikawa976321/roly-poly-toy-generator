@@ -11,8 +11,17 @@
 
 import type { Gene } from "../types";
 import { effectiveProfile } from "./profileExtension";
-import { cutWouldChangeMesh, geneTopCutParams, topCutTanAngle } from "./meshPlaneCut";
+import {
+  cutWouldChangeMesh,
+  geneTopCutParams,
+  signedCutDist,
+  topCutTanAngle,
+} from "./meshPlaneCut";
 import { revolutionGeometryFromGene } from "./mesh";
+import {
+  makeProfileSplineEdge,
+  subsampleProfileUniformZ,
+} from "./stepProfile.ts";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ocPromise: Promise<any> | null = null;
@@ -84,50 +93,80 @@ function makeHalfSpaceSolid(
   throw new Error("opencascade.js: MakeHalfSpace API not available");
 }
 
-/** Boolean Cut（1.1.1: _3=2形状, ProgressRange 非対応。_2 は1引数の別オーバーロード） */
+/** Boolean Common（1.1.1: _3=2形状） */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function booleanCutSolid(
+function booleanCommonSolid(
   oc: any,
   solid: any,
   tool: any,
   t: <T>(obj: T) => T,
 ): any {
-  const runBuild = (cut: any) => {
-    if (typeof cut.Build === "function") {
-      cut.Build();
-    }
+  const runBuild = (op: any) => {
+    if (typeof op.Build === "function") op.Build();
   };
 
-  const finishCut = (cut: any) => {
-    runBuild(cut);
-    if (typeof cut.IsDone === "function" && !cut.IsDone()) {
-      throw new Error("BRepAlgoAPI_Cut failed for plane cut");
+  const finish = (op: any) => {
+    runBuild(op);
+    if (typeof op.IsDone === "function" && !op.IsDone()) {
+      throw new Error("BRepAlgoAPI_Common failed for plane cut");
     }
-    return cut.Shape();
+    return op.Shape();
   };
 
-  if (oc.BRepAlgoAPI_Cut_3) {
-    return finishCut(t(new oc.BRepAlgoAPI_Cut_3(solid, tool)));
+  if (oc.BRepAlgoAPI_Common_3) {
+    return finish(t(new oc.BRepAlgoAPI_Common_3(solid, tool)));
   }
 
-  if (oc.BRepAlgoAPI_Cut_1) {
-    const cut = t(new oc.BRepAlgoAPI_Cut_1());
-    if (typeof cut.SetArguments === "function" && typeof cut.SetTools === "function") {
-      cut.SetArguments(solid);
-      cut.SetTools(tool);
-    } else if (typeof cut.AddArgument === "function" && typeof cut.AddTool === "function") {
-      cut.AddArgument(solid);
-      cut.AddTool(tool);
+  if (oc.BRepAlgoAPI_Common_1) {
+    const common = t(new oc.BRepAlgoAPI_Common_1());
+    if (
+      typeof common.SetArguments === "function" &&
+      typeof common.SetTools === "function"
+    ) {
+      common.SetArguments(solid);
+      common.SetTools(tool);
+    } else if (
+      typeof common.AddArgument === "function" &&
+      typeof common.AddTool === "function"
+    ) {
+      common.AddArgument(solid);
+      common.AddTool(tool);
     } else {
-      throw new Error("opencascade.js: BRepAlgoAPI_Cut SetArguments/SetTools not available");
+      throw new Error(
+        "opencascade.js: BRepAlgoAPI_Common SetArguments/SetTools not available",
+      );
     }
-    return finishCut(cut);
+    return finish(common);
   }
 
-  throw new Error("opencascade.js: BRepAlgoAPI_Cut API not available");
+  throw new Error("opencascade.js: BRepAlgoAPI_Common API not available");
 }
 
-/** 回転体ソリッドを z <= z_cut + x·tan(θ) の半空間で切る（OCCT Boolean） */
+/** 残す側（signedCutDist <= 0）上の参照点 */
+function keptSideRefPoint(
+  zCut: number,
+  tanA: number,
+): { x: number; y: number; z: number } {
+  const candidates: Array<{ x: number; z: number }> = [
+    { x: 0, z: zCut - 10 },
+    { x: 0, z: 0 },
+    { x: 0, z: Math.max(0, zCut * 0.5) },
+    { x: -200, z: zCut },
+    { x: 200, z: zCut },
+  ];
+  for (const { x, z } of candidates) {
+    if (signedCutDist({ x, y: 0, z }, zCut, tanA) < -0.1) {
+      return { x, y: 0, z };
+    }
+  }
+  throw new Error("Could not locate reference point on kept side of cut plane");
+}
+
+/**
+ * 回転体ソリッドを z <= z_cut + x·tan(θ) の半空間に切り詰める。
+ * MakeHalfSpace の参照点は残す側。Cut ではなく Common で交差する
+ * （Cut + 残す側 ref は削る側が残り上側だけになる）。
+ */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyStepPlaneCut(
   oc: any,
@@ -139,10 +178,11 @@ function applyStepPlaneCut(
   const tanA = topCutTanAngle(angleDeg);
   const face = makeCutPlaneFace(oc, zCut, tanA, 500, t);
 
-  const refPt = t(new oc.gp_Pnt_3(0, 0, Math.max(0, zCut - 10)));
+  const ref = keptSideRefPoint(zCut, tanA);
+  const refPt = t(new oc.gp_Pnt_3(ref.x, ref.y, ref.z));
   const halfSolid = makeHalfSpaceSolid(oc, face, refPt, t);
 
-  return booleanCutSolid(oc, solid, halfSolid, t);
+  return booleanCommonSolid(oc, solid, halfSolid, t);
 }
 
 /**
@@ -221,12 +261,18 @@ export async function exportGeneToStepBlob(gene: Gene): Promise<Blob> {
       wireMaker.Add_1(edgeMaker.Edge());
     }
 
-    // (B) プロファイル曲線 — 隣接点をエッジで接続
-    for (let i = iStart; i < iEnd; i++) {
-      const p0 = t(new oc.gp_Pnt_3(r[i], 0, z[i]));
-      const p1 = t(new oc.gp_Pnt_3(r[i + 1], 0, z[i + 1]));
-      const edgeMaker = t(new oc.BRepBuilderAPI_MakeEdge_3(p0, p1));
-      wireMaker.Add_1(edgeMaker.Edge());
+    // (B) プロファイル曲線 — B-spline 1 本（失敗時は直線セグメントにフォールバック）
+    const { z: zSub, r: rSub } = subsampleProfileUniformZ(z, r, iStart, iEnd);
+    const profileEdge = makeProfileSplineEdge(oc, zSub, rSub, t);
+    if (profileEdge) {
+      wireMaker.Add_1(profileEdge);
+    } else {
+      for (let i = iStart; i < iEnd; i++) {
+        const p0 = t(new oc.gp_Pnt_3(r[i], 0, z[i]));
+        const p1 = t(new oc.gp_Pnt_3(r[i + 1], 0, z[i + 1]));
+        const edgeMaker = t(new oc.BRepBuilderAPI_MakeEdge_3(p0, p1));
+        wireMaker.Add_1(edgeMaker.Edge());
+      }
     }
 
     // (C) プロファイル終点 → 上端の軸点
