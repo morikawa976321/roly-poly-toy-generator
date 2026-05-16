@@ -102,12 +102,36 @@ def test_extension_c2_continuous_at_junction():
     mask = z1 > H + 1e-9
     ze = z1[mask]
     re = r1[mask]
-    assert abs(re[0] - r_junc) < 0.02, f"radius jump at junction: {re[0]:.3f} vs {r_junc:.3f}"
+    assert re[0] <= r_junc + 1e-6, (
+        f"extension must not bulge outward at junction: {re[0]:.3f} > {r_junc:.3f}"
+    )
     assert abs(r1[len(z0) - 1] - r_junc) < 0.02, "base top should match smooth junction radius"
     assert len(re) >= 2
     dr_ext = (re[1] - re[0]) / (ze[1] - ze[0])
     assert dr_ext < 0, f"extension should taper down: dr={dr_ext:.3f}"
     assert abs(dr_ext - dr_j) < 0.35, f"junction dr mismatch: {dr_ext:.3f} vs {dr_j:.3f}"
+
+
+def test_extension_no_outward_bulge_at_junction():
+    """延長先頭点を r_junc へ張り付けない（付け根の盛り上がり防止）。"""
+    import json
+    from pathlib import Path
+
+    from backend.app.profile_extension import _extension_segment, _junction_state
+
+    dump = Path(__file__).resolve().parents[1] / "docs/designs/6d7afe17fed27c7c/dump.json"
+    with open(dump, encoding="utf-8") as f:
+        gene = Gene(**json.load(f)["gene"])
+
+    z0, r0 = smooth_profile(gene)
+    H = z0[-1]
+    _, r_junc, dr, d2r = _junction_state(z0, r0)
+    d_max = max_top_extension_mm(gene)
+    delta = 0.5 * d_max
+    _, r_seg = _extension_segment(H, r_junc, dr, d2r, delta, max(delta, d_max))
+    assert len(r_seg) >= 2
+    assert r_seg[0] < r_junc - 1e-4
+    assert r_seg[1] <= r_seg[0] + 1e-6
 
 
 def test_extension_spreads_taper_over_delta_max():

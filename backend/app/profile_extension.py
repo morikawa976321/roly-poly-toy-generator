@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Tuple
 import numpy as np
 
 from .shape import _eval_quintic, _quintic_coeffs
-from .smoothing import smooth_profile
+from .smoothing import mild_smooth_profile, smooth_profile
 
 if TYPE_CHECKING:
     from .models import Gene
@@ -98,7 +98,6 @@ def _extension_segment(
     z_seg = np.linspace(H, H + delta, n_samples + 1, dtype=float)[1:]
     r_seg = _eval_quintic(z_seg, H, H + L_span, coeffs)
     np.maximum(r_seg, 0.0, out=r_seg)
-    r_seg[0] = r_junc
     for i in range(1, len(r_seg)):
         if r_seg[i] > r_seg[i - 1]:
             r_seg[i] = r_seg[i - 1]
@@ -162,15 +161,29 @@ def _build_extended(
     return z_out, r_out
 
 
-def effective_profile(gene: Gene) -> Tuple[np.ndarray, np.ndarray]:
+def _profile_with_extension(
+    gene: Gene,
+    z0: np.ndarray,
+    r0: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
     ext = float(getattr(gene, "top_extension_mm", 0.0) or 0.0)
+    if ext <= _Z_EPS:
+        return z0, r0
+    d_max = _compute_delta_max(z0, r0)
+    if ext > d_max + 1e-6:
+        ext = d_max
+    return _build_extended(z0, r0, ext, d_max)
+
+
+def effective_profile(gene: Gene) -> Tuple[np.ndarray, np.ndarray]:
     z0, r0 = smooth_profile(base_gene(gene))
-    if ext > _Z_EPS:
-        d_max = _compute_delta_max(z0, r0)
-        if ext > d_max + 1e-6:
-            ext = d_max
-        z0, r0 = _build_extended(z0, r0, ext, d_max)
-    return z0, r0
+    return _profile_with_extension(gene, z0, r0)
+
+
+def feasibility_profile(gene: Gene) -> Tuple[np.ndarray, np.ndarray]:
+    """feasibility / z_cog_max 用の (z, r)。メッシュ用 ``effective_profile`` より軽い平滑化。"""
+    z0, r0 = mild_smooth_profile(base_gene(gene))
+    return _profile_with_extension(gene, z0, r0)
 
 
 def max_top_extension_mm(gene: Gene, tol: float = 0.05) -> float:

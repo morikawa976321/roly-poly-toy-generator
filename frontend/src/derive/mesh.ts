@@ -119,12 +119,20 @@ export function latheGeometryFromGene(
   return cappedGeometryFromGene(gene, radialSegments);
 }
 
+export function revolutionGeometryFromProfile(
+  z: number[],
+  r: number[],
+  radialSegments = 128,
+): THREE.BufferGeometry {
+  return revolveWatertightGeometry(z, r, radialSegments, 1e-6);
+}
+
 export function revolutionGeometryFromGene(
   gene: Gene,
   radialSegments = 128,
 ): THREE.BufferGeometry {
   const { z, r } = effectiveProfile(gene);
-  return revolveWatertightGeometry(z, r, radialSegments, 1e-6);
+  return revolutionGeometryFromProfile(z, r, radialSegments);
 }
 
 export function cappedGeometryFromGene(

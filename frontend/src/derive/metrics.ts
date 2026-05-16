@@ -1,13 +1,34 @@
 import type { Gene, Metrics } from "../types";
-import {
-  cappedGeometryFromGene,
-  revolutionGeometryFromGene,
-} from "./mesh";
+import { cappedGeometryFromGene } from "./mesh";
 import { metricsFromGeometryWithFeas } from "./meshMetrics";
-import { cutWouldChangeMesh, geneTopCutParams } from "./meshPlaneCut";
-import { feasibilityFromProfile } from "./physics";
-import { effectiveProfile } from "./profileExtension";
+import { feasibilityExtrasForGene } from "./feasibilityMetrics";
 
+/**
+ * gene の最終形状（延長・カット込み）からメトリクスを算出する。
+ * 体積 / 高さ / 幅 / 重心は常にカット後メッシュから求め、3D ビューと一致させる。
+ * z_cog_max / bottom_curvature_radius は feasibility 用プロファイルから求める。
+ */
+export function computeMetrics(gene: Gene): Metrics {
+  const feasExtras = feasibilityExtrasForGene(gene);
+  const geom = cappedGeometryFromGene(gene, 96);
+  return metricsFromGeometryWithFeas(geom, feasExtras);
+}
+
+export function geneWithModifications(
+  gene: Gene,
+  topExtensionMm: number,
+  topCutHeightMm: number,
+  topCutAngleDeg: number,
+): Gene {
+  return {
+    ...gene,
+    top_extension_mm: topExtensionMm,
+    top_cut_height_mm: topCutHeightMm,
+    top_cut_angle_deg: topCutAngleDeg,
+  };
+}
+
+/** プロファイル積分（テスト・デバッグ用）。本番の computeMetrics はメッシュ経路を使う。 */
 export function computeMetricsFromProfile(z: number[], r: number[]): Metrics {
   const volParts: number[] = [];
   const zCentroidParts: number[] = [];
@@ -38,38 +59,5 @@ export function computeMetricsFromProfile(z: number[], r: number[]): Metrics {
     centroid_z: centroidZ,
     bottom_curvature_radius: null,
     z_cog_max: null,
-  };
-}
-
-export function computeMetrics(gene: Gene): Metrics {
-  const { z, r } = effectiveProfile(gene);
-  const feas = feasibilityFromProfile(z, r);
-  const feasExtras = {
-    bottom_curvature_radius: feas.rho_m_bottom,
-    z_cog_max: feas.z_cog_max > 0 ? feas.z_cog_max : null,
-  };
-
-  const rev = revolutionGeometryFromGene(gene, 96);
-  const { zCut, tanA } = geneTopCutParams(gene);
-  if (cutWouldChangeMesh(rev, zCut, tanA)) {
-    const cut = cappedGeometryFromGene(gene, 96);
-    return metricsFromGeometryWithFeas(cut, feasExtras);
-  }
-
-  const base = computeMetricsFromProfile(z, r);
-  return { ...base, ...feasExtras };
-}
-
-export function geneWithModifications(
-  gene: Gene,
-  topExtensionMm: number,
-  topCutHeightMm: number,
-  topCutAngleDeg: number,
-): Gene {
-  return {
-    ...gene,
-    top_extension_mm: topExtensionMm,
-    top_cut_height_mm: topCutHeightMm,
-    top_cut_angle_deg: topCutAngleDeg,
   };
 }

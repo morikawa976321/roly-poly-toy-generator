@@ -72,7 +72,7 @@ export function metricsFromGeometry(geom: THREE.BufferGeometry): {
   }
 
   const volume = Math.abs(vol);
-  const centroidZ = volume > 1e-12 ? cz / vol : 0;
+  const centroidZ = Math.abs(vol) > 1e-12 ? cz / vol : 0;
 
   return {
     volume,

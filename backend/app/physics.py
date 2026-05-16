@@ -227,9 +227,9 @@ def rolypoly_feasibility(
     ただし **生成時の値より保守的** な結果になることがある（平滑化で曲率が少し
     緩くなり、z_cog_max が小さめに出る傾向）。
     """
-    from .profile_extension import effective_profile
+    from .profile_extension import feasibility_profile
 
-    z_dense, r_dense = effective_profile(gene)
+    z_dense, r_dense = feasibility_profile(gene)
     n = len(z_dense)
     if n < 6:
         return Feasibility(
@@ -243,5 +243,5 @@ def rolypoly_feasibility(
         theta_max_deg=theta_max_deg,
         eps_mm=eps_mm,
         safety_margin=safety_margin,
-        smooth_derivatives=False,
+        smooth_derivatives=True,
     )

@@ -1,5 +1,5 @@
 import type { Gene } from "../types";
-import { smoothProfile } from "./smoothing";
+import { mildSmoothProfile, smoothProfile } from "./smoothing";
 
 const EXTENSION_SAMPLES = 96;
 const JUNCTION_FIT_WINDOW = 24;
@@ -187,11 +187,8 @@ function extensionSegment(
     z.push(zi);
     r.push(Math.max(0, evalQuintic([zi], H, H + Lspan, coeffs)[0]));
   }
-  if (r.length > 0) {
-    r[0] = rJunc;
-    for (let i = 1; i < r.length; i++) {
-      if (r[i] > r[i - 1]) r[i] = r[i - 1];
-    }
+  for (let i = 1; i < r.length; i++) {
+    if (r[i] > r[i - 1]) r[i] = r[i - 1];
   }
   return { z, r };
 }
@@ -253,15 +250,28 @@ function buildExtended(
   return { z, r };
 }
 
-export function effectiveProfile(gene: Gene): { z: number[]; r: number[] } {
+function profileWithExtension(
+  gene: Gene,
+  z0: number[],
+  r0: number[],
+): { z: number[]; r: number[] } {
   const ext = Number(gene.top_extension_mm ?? 0);
-  let { z, r } = smoothProfile(baseGene(gene));
-  if (Number.isFinite(ext) && ext > Z_EPS) {
-    const dMax = computeDeltaMax(z, r);
-    const clamped = Math.min(ext, dMax);
-    ({ z, r } = buildExtended(z, r, clamped, dMax));
+  if (!Number.isFinite(ext) || ext <= Z_EPS) {
+    return { z: z0, r: r0 };
   }
-  return { z, r };
+  const dMax = computeDeltaMax(z0, r0);
+  const clamped = Math.min(ext, dMax);
+  return buildExtended(z0, r0, clamped, dMax);
+}
+
+export function effectiveProfile(gene: Gene): { z: number[]; r: number[] } {
+  const { z, r } = smoothProfile(baseGene(gene));
+  return profileWithExtension(gene, z, r);
+}
+
+export function feasibilityProfile(gene: Gene): { z: number[]; r: number[] } {
+  const { z, r } = mildSmoothProfile(baseGene(gene));
+  return profileWithExtension(gene, z, r);
 }
 
 export function maxTopExtensionMm(gene: Gene, tol = 0.05): number {

@@ -9,7 +9,7 @@ import { maxTopExtensionMm } from "../derive/profileExtension";
 import { thumbnailDataUrl } from "../derive/thumbnailSvg";
 import { exportGeneToStepBlob } from "../derive/stepExporter";
 
-const PREVIEW_DEBOUNCE_MS = 1000;
+const PREVIEW_DEBOUNCE_MS = 400;
 
 type PreviewParams = {
   extensionMm: number;
@@ -32,11 +32,16 @@ export default function DetailPage() {
   const [saving, setSaving] = useState(false);
   const [stepLoading, setStepLoading] = useState(false);
   const stepBlobUrlRef = useRef<string | null>(null);
+  const initExtensionForDesignRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!data) return;
+    const useMaxDefault = initExtensionForDesignRef.current !== data.design_id;
+    initExtensionForDesignRef.current = data.design_id;
     const params: PreviewParams = {
-      extensionMm: Number(data.gene.top_extension_mm ?? 0),
+      extensionMm: useMaxDefault
+        ? maxTopExtensionMm(data.gene)
+        : Number(data.gene.top_extension_mm ?? 0),
       cutHeightMm: Number(data.gene.top_cut_height_mm ?? 0),
       cutAngleDeg: Number(data.gene.top_cut_angle_deg ?? 0),
     };

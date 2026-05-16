@@ -13,6 +13,30 @@ export type Feasibility = {
   worst_margin: number;
 };
 
+function gaussianFilter1dNearest(x: number[], sigma: number): number[] {
+  if (!Number.isFinite(sigma) || sigma <= 0) return x.slice();
+  const radius = Math.trunc(Math.max(3, Math.round(4.0 * sigma)));
+  const k: number[] = [];
+  let s = 0;
+  for (let i = -radius; i <= radius; i++) {
+    const v = Math.exp(-0.5 * (i / sigma) ** 2);
+    k.push(v);
+    s += v;
+  }
+  for (let i = 0; i < k.length; i++) k[i] /= s;
+  const n = x.length;
+  const out: number[] = new Array(n);
+  for (let i = 0; i < n; i++) {
+    let acc = 0;
+    for (let j = -radius; j <= radius; j++) {
+      const idx = Math.min(n - 1, Math.max(0, i + j));
+      acc += x[idx] * k[j + radius];
+    }
+    out[i] = acc;
+  }
+  return out;
+}
+
 function gradient(y: number[], x: number[]): number[] {
   const n = y.length;
   const out = new Array<number>(n);
@@ -31,6 +55,7 @@ export function feasibilityFromProfile(
   thetaMaxDeg = TILT_MAX_DEG,
   epsMm = EPS_MM,
   safetyMargin = 0.85,
+  smoothDerivatives = false,
 ): Feasibility {
   const z = zIn.slice();
   const r = rIn.slice();
@@ -52,8 +77,13 @@ export function feasibilityFromProfile(
 
   const zAsc = z.slice(0, peakIdx + 1);
   const rAsc = r.slice(0, peakIdx + 1);
-  const rp = gradient(rAsc, zAsc);
-  const rpp = gradient(rp, zAsc);
+  let rp = gradient(rAsc, zAsc);
+  let rpp = gradient(rp, zAsc);
+  if (smoothDerivatives) {
+    const sigma = Math.max(1, zAsc.length / 60);
+    rp = gaussianFilter1dNearest(rp, sigma);
+    rpp = gaussianFilter1dNearest(rpp, sigma);
+  }
   const headSkip = Math.max(3, Math.trunc(HEAD_SKIP_FRACTION * zAsc.length));
 
   const cotThmax = 1 / Math.tan((thetaMaxDeg * Math.PI) / 180);

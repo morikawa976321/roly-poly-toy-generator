@@ -97,7 +97,7 @@ def generate_designs(payload: GenerateRequest | None = None) -> GenerateResponse
         did = design_id_for(gene)
         if exists(did):
             continue
-        metrics = compute_metrics(gene)
+        metrics = compute_metrics(gene, feasibility=feasibility)
         summary = upsert_design(did, gene, metrics)
         created.append(summary)
 

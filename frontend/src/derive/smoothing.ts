@@ -2,6 +2,8 @@ import type { Gene } from "../types";
 
 // backend/app/smoothing.py と同等の挙動（SciPy-free）。
 export const DENSE_FACTOR = 24;
+export const FEASIBILITY_PROFILE_N = 281;
+export const FEASIBILITY_SMOOTH_SIGMA = 8;
 
 function effectiveZWarp(zWarp: unknown): number {
   if (zWarp === null || zWarp === undefined) return 1.0;
@@ -106,6 +108,30 @@ export function smoothProfile(
   const rDense = gaussianFilter1dNearest(rLin, DENSE_FACTOR);
 
   // 端点固定 + 非負クリップ
+  if (rDense.length > 0) {
+    rDense[0] = rNodes[0];
+    rDense[rDense.length - 1] = rNodes[rNodes.length - 1];
+  }
+  for (let i = 0; i < rDense.length; i++) {
+    if (rDense[i] < 0) rDense[i] = 0;
+  }
+  return { z: zDense, r: rDense };
+}
+
+export function mildSmoothProfile(gene: Gene): { z: number[]; r: number[] } {
+  const zNodes = geneZNodes(gene);
+  const rNodes = gene.radii.map((v) => Number(v));
+  const height = Number(gene.height);
+  const n = FEASIBILITY_PROFILE_N;
+  const zDense: number[] = [];
+  for (let i = 0; i < n; i++) {
+    zDense.push(height * (n <= 1 ? 0 : i / (n - 1)));
+  }
+  const rLin = interp1(zDense, zNodes, rNodes);
+  const rDense =
+    FEASIBILITY_SMOOTH_SIGMA > 0
+      ? gaussianFilter1dNearest(rLin, FEASIBILITY_SMOOTH_SIGMA)
+      : rLin.slice();
   if (rDense.length > 0) {
     rDense[0] = rNodes[0];
     rDense[rDense.length - 1] = rNodes[rNodes.length - 1];

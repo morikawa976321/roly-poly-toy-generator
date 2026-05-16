@@ -28,6 +28,11 @@ else:
 # 大きいほど滑らかさが忠実に再現されるが、メッシュ頂点数が増えて重くなる。
 DENSE_FACTOR: int = 24
 
+# feasibility 判定専用: メッシュ用の DENSE_FACTOR 平滑化は曲率を過小評価し
+# z_cog_max が 0 になる偽不合格が多い。パラメトリック生成時に近い軽い平滑化を使う。
+FEASIBILITY_PROFILE_N: int = 281
+FEASIBILITY_SMOOTH_SIGMA: float = 8.0
+
 
 def _gaussian_filter1d(x: np.ndarray, sigma: float) -> np.ndarray:
     """1D Gaussian smoothing with nearest edge handling (SciPy-free)."""
@@ -129,6 +134,32 @@ def smooth_profile(
     # 端点のハード固定 + 負値のクリップ（数値誤差対策）。
     # v2 gene では r_nodes[0]=0（球キャップの極点）、r_nodes[-1]=rt≥0（上端丸め半径）。
     # v1 gene では r_nodes[0]=bottom_radius>0、r_nodes[-1]=0。どちらもそのまま使う。
+    r_dense[0] = float(r_nodes[0])
+    r_dense[-1] = float(r_nodes[-1])
+    np.maximum(r_dense, 0.0, out=r_dense)
+    return z_dense, r_dense
+
+
+def mild_smooth_profile(
+    gene: Gene,
+    *,
+    n_dense: int = FEASIBILITY_PROFILE_N,
+    sigma: float = FEASIBILITY_SMOOTH_SIGMA,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """gene 制御点から feasibility 向けの (z, r) を返す。
+
+    z は ``linspace(0, height)``（生成時パラメトリックプロファイルと同型）。
+    半径は線形補間のあと ``sigma`` で軽くガウシアン平滑化する（``DENSE_FACTOR``
+    ほど強くしない）。メッシュ描画用 ``smooth_profile`` とは別経路。
+    """
+    z_nodes = gene_z_nodes(gene)
+    r_nodes = np.asarray(gene.radii, dtype=float)
+    z_dense = np.linspace(0.0, float(gene.height), int(n_dense))
+    r_lin = np.interp(z_dense, z_nodes, r_nodes)
+    if sigma > 0.0:
+        r_dense = _gaussian_filter1d(r_lin, sigma=float(sigma))
+    else:
+        r_dense = np.asarray(r_lin, dtype=float)
     r_dense[0] = float(r_nodes[0])
     r_dense[-1] = float(r_nodes[-1])
     np.maximum(r_dense, 0.0, out=r_dense)

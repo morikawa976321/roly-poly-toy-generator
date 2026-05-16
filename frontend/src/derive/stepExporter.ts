@@ -17,6 +17,116 @@ import { revolutionGeometryFromGene } from "./mesh";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ocPromise: Promise<any> | null = null;
 
+/** カット平面 z = zCut + u·tanA 上の大きな矩形フェース（MakeFace_2 の UV 版は 1.1.1 で非対応） */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeCutPlaneFace(
+  oc: any,
+  zCut: number,
+  tanA: number,
+  halfSize: number,
+  t: <T>(obj: T) => T,
+): any {
+  const L = halfSize;
+  const wireMaker = t(new oc.BRepBuilderAPI_MakeWire_1());
+  const corners: [number, number][] = [
+    [-L, -L],
+    [L, -L],
+    [L, L],
+    [-L, L],
+  ];
+  const pnt = (u: number, v: number) =>
+    t(new oc.gp_Pnt_3(u, v, zCut + tanA * u));
+
+  for (let i = 0; i < 4; i++) {
+    const [u0, v0] = corners[i];
+    const [u1, v1] = corners[(i + 1) % 4];
+    const edgeMaker = t(new oc.BRepBuilderAPI_MakeEdge_3(pnt(u0, v0), pnt(u1, v1)));
+    wireMaker.Add_1(edgeMaker.Edge());
+  }
+
+  const MakeFaceCtor =
+    oc.BRepBuilderAPI_MakeFace_15 ?? oc.BRepBuilderAPI_MakeFace_1;
+  const faceMaker = t(new MakeFaceCtor(wireMaker.Wire(), true));
+  return faceMaker.Face();
+}
+
+/** Face から半空間ソリッドを作る（MakeHalfSpace_2 は Shell 専用なので使わない） */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeHalfSpaceSolid(
+  oc: any,
+  face: any,
+  refPt: any,
+  t: <T>(obj: T) => T,
+): any {
+  if (oc.BRepPrimAPI_MakeHalfSpace_1) {
+    const mkHalf = t(new oc.BRepPrimAPI_MakeHalfSpace_1(face, refPt));
+    if (typeof mkHalf.IsDone === "function" && !mkHalf.IsDone()) {
+      throw new Error("MakeHalfSpace failed for cut plane");
+    }
+    return typeof mkHalf.Solid === "function" ? mkHalf.Solid() : mkHalf.Shape();
+  }
+
+  if (oc.BRepPrimAPI_MakeHalfSpace_2) {
+    const shellMaker = t(new oc.BRepBuilderAPI_MakeShell_1());
+    const add = shellMaker.Add_1 ?? shellMaker.Add;
+    if (typeof add !== "function") {
+      throw new Error("BRepBuilderAPI_MakeShell.Add not available");
+    }
+    add.call(shellMaker, face);
+    const shell = shellMaker.Shell();
+    const mkHalf = t(new oc.BRepPrimAPI_MakeHalfSpace_2(shell, refPt));
+    if (typeof mkHalf.IsDone === "function" && !mkHalf.IsDone()) {
+      throw new Error("MakeHalfSpace failed for cut plane");
+    }
+    return typeof mkHalf.Solid === "function" ? mkHalf.Solid() : mkHalf.Shape();
+  }
+
+  throw new Error("opencascade.js: MakeHalfSpace API not available");
+}
+
+/** Boolean Cut（1.1.1: _3=2形状, ProgressRange 非対応。_2 は1引数の別オーバーロード） */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function booleanCutSolid(
+  oc: any,
+  solid: any,
+  tool: any,
+  t: <T>(obj: T) => T,
+): any {
+  const runBuild = (cut: any) => {
+    if (typeof cut.Build === "function") {
+      cut.Build();
+    }
+  };
+
+  const finishCut = (cut: any) => {
+    runBuild(cut);
+    if (typeof cut.IsDone === "function" && !cut.IsDone()) {
+      throw new Error("BRepAlgoAPI_Cut failed for plane cut");
+    }
+    return cut.Shape();
+  };
+
+  if (oc.BRepAlgoAPI_Cut_3) {
+    return finishCut(t(new oc.BRepAlgoAPI_Cut_3(solid, tool)));
+  }
+
+  if (oc.BRepAlgoAPI_Cut_1) {
+    const cut = t(new oc.BRepAlgoAPI_Cut_1());
+    if (typeof cut.SetArguments === "function" && typeof cut.SetTools === "function") {
+      cut.SetArguments(solid);
+      cut.SetTools(tool);
+    } else if (typeof cut.AddArgument === "function" && typeof cut.AddTool === "function") {
+      cut.AddArgument(solid);
+      cut.AddTool(tool);
+    } else {
+      throw new Error("opencascade.js: BRepAlgoAPI_Cut SetArguments/SetTools not available");
+    }
+    return finishCut(cut);
+  }
+
+  throw new Error("opencascade.js: BRepAlgoAPI_Cut API not available");
+}
+
 /** 回転体ソリッドを z <= z_cut + x·tan(θ) の半空間で切る（OCCT Boolean） */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyStepPlaneCut(
@@ -27,21 +137,12 @@ function applyStepPlaneCut(
   t: <T>(obj: T) => T,
 ): any {
   const tanA = topCutTanAngle(angleDeg);
-  const nlen = Math.hypot(tanA, 1);
-  const dir = t(new oc.gp_Dir_4(-tanA / nlen, 0, 1 / nlen));
-  const pln = t(new oc.gp_Pln_3(new oc.gp_Pnt_3(0, 0, zCut), dir));
-
-  const mkFace = t(new oc.BRepBuilderAPI_MakeFace_2(pln, -500, 500, -500, 500));
-  const face = mkFace.Face();
+  const face = makeCutPlaneFace(oc, zCut, tanA, 500, t);
 
   const refPt = t(new oc.gp_Pnt_3(0, 0, Math.max(0, zCut - 10)));
-  const mkHalf = t(new oc.BRepPrimAPI_MakeHalfSpace_2(face, refPt));
-  const halfSolid = mkHalf.Solid();
+  const halfSolid = makeHalfSpaceSolid(oc, face, refPt, t);
 
-  const CutCtor = oc.BRepAlgoAPI_Cut_3 ?? oc.BRepAlgoAPI_Cut;
-  const cut = t(new CutCtor(solid, halfSolid, new oc.Message_ProgressRange_1()));
-  cut.Build(new oc.Message_ProgressRange_1());
-  return cut.Shape();
+  return booleanCutSolid(oc, solid, halfSolid, t);
 }
 
 /**
