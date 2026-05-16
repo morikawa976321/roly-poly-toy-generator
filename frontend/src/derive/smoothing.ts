@@ -24,7 +24,7 @@ export function geneZNodes(gene: Gene): number[] {
   return out;
 }
 
-export function denseZ(
+function denseZ(
   height: number,
   nNodes: number,
   factor: number,

@@ -264,11 +264,7 @@ roly-poly-toy-generator/
 │       └── 6d7afe17fed27c7c/       # リファレンスデザインの完全ダンプ（検証・deploy 用）
 │           ├── README.md
 │           ├── gene.json
-│           ├── dump.json
-│           ├── smooth_profile.json
-│           ├── smooth_profile_z_mm.json
-│           ├── smooth_profile_r_mm.json
-│           └── z_nodes_mm.json
+│           └── dump.json
 ├── frontend/
 │   ├── index.html
 │   ├── package.json
@@ -328,13 +324,14 @@ roly-poly-toy-generator/
 ├── scripts/
 │   ├── dev.mjs                     # npm run dev のオーケストレータ
 │   ├── stop.mjs                    # 孤児プロセス回収
-│   ├── package-windows.ps1         # Windows zip 配布ビルド
-│   └── debug_cut_zcog.py           # カットが z_cog_max に与える影響のデバッグ
+│   └── package-windows.ps1         # Windows zip 配布ビルド
+├── tools/
+│   ├── debug_cut_zcog.py           # カットが z_cog_max に与える影響のデバッグ
+│   └── oc-apis.txt                 # opencascade.js API リファレンス（ローカル用）
 ├── data/
 │   └── app.db                      # ローカル SQLite DB（git 管理外）
 ├── build/                          # PyInstaller 出力・配布 zip（git 管理外）
 ├── MATH_ROLY_POLY_TOY.md           # 起き上がりこぼしの数学的背景
-├── oc-apis.txt                     # opencascade.js API リファレンス（ローカル用）
 ├── LICENSE
 ├── pyproject.toml                  # Python プロジェクト定義（uv 用）
 ├── package.json                    # ルートの npm scripts（dev / stop / package:windows）

@@ -7,7 +7,7 @@ const JUNCTION_FIT_MIN = 8;
 const R_EPS = 1e-9;
 const Z_EPS = 1e-9;
 
-export function baseGene(gene: Gene): Gene {
+function baseGene(gene: Gene): Gene {
   return { ...gene, top_extension_mm: 0 };
 }
 

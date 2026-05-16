@@ -17,7 +17,7 @@ function dot(ax: number, ay: number, az: number, bx: number, by: number, bz: num
 }
 
 /** 閉じた三角メッシュの体積・重心 z（原点基準の符号付き体積） */
-export function metricsFromGeometry(geom: THREE.BufferGeometry): {
+function metricsFromGeometry(geom: THREE.BufferGeometry): {
   volume: number;
   centroidZ: number;
   height: number;

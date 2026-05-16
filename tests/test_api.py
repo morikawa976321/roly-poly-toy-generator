@@ -122,31 +122,16 @@ def test_patch_design_updates_extension(
     monkeypatch.setattr("backend.app.api.get_design", fake_get_design)
     monkeypatch.setattr("backend.app.api.update_design", fake_update)
 
-    import math
+    from backend.app.gene import sample_gene
 
-    from backend.app.models import Gene as GeneModel
-
-    n = 36
-    radii = [0.0]
-    for i in range(1, n - 1):
-        t = i / (n - 1)
-        radii.append(20.0 * math.sin(math.pi * t))
-    radii.append(2.0)
-    rich_gene = GeneModel(
-        version=2,
-        N=n,
-        height=50.0,
-        bottom_radius=0.0,
-        radii=radii,
-        z_warp=2.0,
-        top_extension_mm=0.0,
-    )
+    rich_gene = sample_gene(seed=42)
+    rich_gene = rich_gene.model_copy(update={"top_extension_mm": 0.0})
     stored["gene"] = rich_gene
-    stored["metrics"] = _make_metrics(height=50.0)
+    stored["metrics"] = _make_metrics(height=float(rich_gene.height))
 
     d_max = max_top_extension_mm(rich_gene)
     assert d_max > 0.5
-    ext = min(2.0, d_max)
+    ext = min(1.0, d_max)
     r = client.patch(
         "/api/designs/abc123",
         json={
@@ -158,7 +143,7 @@ def test_patch_design_updates_extension(
     assert r.status_code == 200
     body = r.json()
     assert body["gene"]["top_extension_mm"] == ext
-    assert body["metrics"]["height"] > 50.0
+    assert body["metrics"]["height"] > float(rich_gene.height)
 
 
 # ------------------------ POST /api/designs/generate --------------------

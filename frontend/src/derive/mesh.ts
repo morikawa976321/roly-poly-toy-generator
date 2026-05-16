@@ -112,13 +112,6 @@ function revolveWatertightGeometry(
   return geom;
 }
 
-export function latheGeometryFromGene(
-  gene: Gene,
-  radialSegments = 128,
-): THREE.BufferGeometry {
-  return cappedGeometryFromGene(gene, radialSegments);
-}
-
 export function revolutionGeometryFromProfile(
   z: number[],
   r: number[],

@@ -240,7 +240,6 @@ REPO_ROOT: Path = Path(__file__).resolve().parents[2]
 
 APP_NAME: Final[str] = "roly-poly-toy-generator"
 LOCAL_DATA_DIRNAME: Final[str] = "data"
-LOCAL_CACHE_DIRNAME: Final[str] = "cache"
 LOCAL_DB_FILENAME: Final[str] = "app.db"
 IDLE_SHUTDOWN_SECONDS: Final[int] = 10 * 60
 
@@ -266,10 +265,6 @@ def app_base_dir() -> Path:
 
 def local_data_dir() -> Path:
     return app_base_dir() / LOCAL_DATA_DIRNAME
-
-
-def local_cache_dir() -> Path:
-    return local_data_dir() / LOCAL_CACHE_DIRNAME
 
 
 def sqlite_db_path() -> Path:

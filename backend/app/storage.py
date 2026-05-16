@@ -15,9 +15,65 @@ from .models import DesignSummary, Gene, Metrics
 
 TABLE = "designs"
 
+_CREATE_TABLE_SQL = f"""
+CREATE TABLE IF NOT EXISTS {TABLE} (
+    design_id TEXT PRIMARY KEY,
+    gene_json TEXT NOT NULL,
+    volume REAL NOT NULL,
+    height REAL NOT NULL,
+    max_width REAL NOT NULL,
+    centroid_z REAL NOT NULL,
+    bottom_curvature_radius REAL,
+    z_cog_max REAL,
+    created_at TEXT NOT NULL
+)
+"""
+
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _table_columns(con: sqlite3.Connection, table: str) -> set[str]:
+    rows = con.execute(f"PRAGMA table_info({table})").fetchall()
+    return {str(r[1]) for r in rows}
+
+
+def _migrate_drop_z_cog_suggested(con: sqlite3.Connection) -> None:
+    """レガシ列 z_cog_suggested を除去する（既存 DB のみ）。"""
+    if "z_cog_suggested" not in _table_columns(con, TABLE):
+        return
+    con.execute(
+        f"""
+        CREATE TABLE {TABLE}_new (
+            design_id TEXT PRIMARY KEY,
+            gene_json TEXT NOT NULL,
+            volume REAL NOT NULL,
+            height REAL NOT NULL,
+            max_width REAL NOT NULL,
+            centroid_z REAL NOT NULL,
+            bottom_curvature_radius REAL,
+            z_cog_max REAL,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    con.execute(
+        f"""
+        INSERT INTO {TABLE}_new
+        SELECT design_id, gene_json, volume, height, max_width, centroid_z,
+               bottom_curvature_radius, z_cog_max, created_at
+        FROM {TABLE}
+        """
+    )
+    con.execute(f"DROP TABLE {TABLE}")
+    con.execute(f"ALTER TABLE {TABLE}_new RENAME TO {TABLE}")
+    con.execute(
+        f"""
+        CREATE INDEX IF NOT EXISTS designs_created_at_idx
+        ON {TABLE} (created_at DESC, design_id DESC)
+        """
+    )
 
 
 @lru_cache(maxsize=1)
@@ -27,22 +83,8 @@ def init_db() -> None:
     local_data_dir().mkdir(parents=True, exist_ok=True)
     with sqlite3.connect(sqlite_db_path()) as con:
         con.execute("PRAGMA journal_mode=WAL")
-        con.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {TABLE} (
-                design_id TEXT PRIMARY KEY,
-                gene_json TEXT NOT NULL,
-                volume REAL NOT NULL,
-                height REAL NOT NULL,
-                max_width REAL NOT NULL,
-                centroid_z REAL NOT NULL,
-                z_cog_suggested REAL,
-                bottom_curvature_radius REAL,
-                z_cog_max REAL,
-                created_at TEXT NOT NULL
-            )
-            """
-        )
+        con.execute(_CREATE_TABLE_SQL)
+        _migrate_drop_z_cog_suggested(con)
         con.execute(
             f"""
             CREATE INDEX IF NOT EXISTS designs_created_at_idx
@@ -95,7 +137,6 @@ def upsert_design(
         float(metrics.height),
         float(metrics.max_width),
         float(metrics.centroid_z),
-        None,
         metrics.bottom_curvature_radius,
         metrics.z_cog_max,
         _now_iso(),
@@ -107,8 +148,8 @@ def upsert_design(
             f"""
             INSERT OR IGNORE INTO {TABLE}
               (design_id, gene_json, volume, height, max_width, centroid_z,
-               z_cog_suggested, bottom_curvature_radius, z_cog_max, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               bottom_curvature_radius, z_cog_max, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             payload,
         )
@@ -126,7 +167,7 @@ def list_designs(limit: int = 100, offset: int = 0) -> Tuple[List[DesignSummary]
         rows = con.execute(
             f"""
             SELECT design_id, gene_json, volume, height, max_width, centroid_z,
-                   z_cog_suggested, bottom_curvature_radius, z_cog_max, created_at
+                   bottom_curvature_radius, z_cog_max, created_at
             FROM {TABLE}
             ORDER BY created_at DESC, design_id DESC
             LIMIT ? OFFSET ?
@@ -146,34 +187,12 @@ def list_designs(limit: int = 100, offset: int = 0) -> Tuple[List[DesignSummary]
     return out, total
 
 
-def list_designs_with_genes(
-    limit: int = 100, offset: int = 0
-) -> Tuple[List[Tuple[str, Gene, str]], int]:
-    """gene 付きで designs を列挙する（フロントで派生物生成したい用途）。"""
-    with _connect() as con:
-        total = int(con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0])
-        rows = con.execute(
-            f"""
-            SELECT design_id, gene_json, created_at
-            FROM {TABLE}
-            ORDER BY created_at DESC, design_id DESC
-            LIMIT ? OFFSET ?
-            """,
-            (limit, offset),
-        ).fetchall()
-    out: List[Tuple[str, Gene, str]] = []
-    for r in rows:
-        gene = Gene.model_validate(json.loads(r["gene_json"]))
-        out.append((r["design_id"], gene, r["created_at"]))
-    return out, total
-
-
 def get_design(design_id: str) -> Optional[Tuple[Gene, Metrics, str]]:
     with _connect() as con:
         row = con.execute(
             f"""
             SELECT gene_json, volume, height, max_width, centroid_z,
-                   z_cog_suggested, bottom_curvature_radius, z_cog_max, created_at
+                   bottom_curvature_radius, z_cog_max, created_at
             FROM {TABLE}
             WHERE design_id = ?
             LIMIT 1

@@ -9,9 +9,7 @@
 | created_at | `2026-04-22T15:04:57Z` |
 | データ抽出 | 2026-05-16（ローカル環境） |
 | gene.json | [`gene.json`](gene.json) |
-| 機械可読ダンプ | [`dump.json`](dump.json) |
-| smooth_profile（1513点） | [`smooth_profile.json`](smooth_profile.json) |
-| z_nodes 配列 | [`z_nodes_mm.json`](z_nodes_mm.json) |
+| 機械可読ダンプ（smooth_profile 全点含む） | [`dump.json`](dump.json) |
 
 ## 1. 識別子・ハッシュ
 
@@ -594,7 +592,7 @@ feasibility フィールドは含まない。
 ## 11. smooth_profile（密サンプル・全 1513 点）
 
 全 **1513** 点（`smooth_profile(gene)`）。
-全点は [`smooth_profile.json`](smooth_profile.json) に収録。
+全点は [`dump.json`](dump.json) の `smooth_profile_sample` に収録。
 下表は MD 内表示用に約 21 点に間引き。
 
 | z (mm) | r (mm) |

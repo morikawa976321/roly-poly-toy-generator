@@ -1,9 +1,9 @@
 /** backend/app/physics.py の TS ポート（feasibility 判定）。 */
 
-export const TILT_MAX_DEG = 75.0;
-export const EPS_MM = 0.5;
-export const RHO_M_CAP_MM = 200.0;
-export const HEAD_SKIP_FRACTION = 0.03;
+const TILT_MAX_DEG = 75.0;
+const EPS_MM = 0.5;
+const RHO_M_CAP_MM = 200.0;
+const HEAD_SKIP_FRACTION = 0.03;
 
 export type Feasibility = {
   is_feasible: boolean;

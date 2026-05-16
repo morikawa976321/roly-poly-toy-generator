@@ -22,7 +22,6 @@ v1 の折れ線ランダム生成関数は廃止した（既存 v1 gene は ``ve
 
 from __future__ import annotations
 
-import random
 from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -236,8 +235,7 @@ def sample_gene_with_feasibility(
     """feasibility を満たす v2 gene と、生成時に計算した feasibility を返す。
 
     feasibility は **摂動前の密パラメトリックプロファイル**（281 点）上で
-    評価する。これは低解像度の再評価より精度が高く、
-    z_cog_suggested としてそのまま保存できる値になる。
+    評価する。これは低解像度の再評価より精度が高い。
 
     摂動（jitter）は保存形（radii）にだけ影響し、物理的な形はほぼ変わらないため、
     ここで計算した feasibility を保存しても実用上問題ない。
@@ -300,13 +298,3 @@ def sample_gene(
     """
     gene, _ = sample_gene_with_feasibility(seed=seed, max_retry=max_retry)
     return gene
-
-
-def sample_gene_python_random(rng: Optional[random.Random] = None) -> Gene:
-    """``random.Random`` を受け付ける別入口。
-
-    呼び出し側が既にシード済みの ``random.Random`` を持っているときに使う。
-    """
-    rand = rng or random.Random()
-    seed = rand.getrandbits(64)
-    return sample_gene(seed=seed)
