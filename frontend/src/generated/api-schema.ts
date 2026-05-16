@@ -183,6 +183,9 @@ export interface components {
          *       から生成され、θ_max=75° まで自己復元可能な形状のみ。z_warp=2.0。
          *
          *     両バージョンとも radii は単峰（ある peak index までは単調増加、以降は単調減少）。
+         *
+         *     ``top_extension_mm`` はベース形状（radii / height）を変えずに上方向へ
+         *     付与する延長量（mm）。0 でベース形状のみ。
          */
         Gene: {
             /** Version */
@@ -237,15 +240,6 @@ export interface components {
             /** Total */
             total: number;
         };
-        /** PatchDesignRequest */
-        PatchDesignRequest: {
-            /** Top Extension Mm */
-            top_extension_mm: number;
-            /** Top Cut Height Mm */
-            top_cut_height_mm: number;
-            /** Top Cut Angle Deg */
-            top_cut_angle_deg: number;
-        };
         /** Metrics */
         Metrics: {
             /** Volume */
@@ -260,6 +254,15 @@ export interface components {
             bottom_curvature_radius?: number | null;
             /** Z Cog Max */
             z_cog_max?: number | null;
+        };
+        /** PatchDesignRequest */
+        PatchDesignRequest: {
+            /** Top Extension Mm */
+            top_extension_mm: number;
+            /** Top Cut Height Mm */
+            top_cut_height_mm: number;
+            /** Top Cut Angle Deg */
+            top_cut_angle_deg: number;
         };
         /** ValidationError */
         ValidationError: {

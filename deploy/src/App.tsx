@@ -37,7 +37,7 @@ function Panel({
 }) {
   return (
     <section
-      className={`flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden ${className}`}
+      className={`flex flex-col rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden ${fill ? "h-full min-h-0" : ""} ${className}`}
     >
       <header className="shrink-0 border-b border-slate-100 bg-slate-50/80 px-4 py-2.5">
         <h2 className="text-sm font-medium text-slate-700">{title}</h2>
@@ -281,7 +281,7 @@ export default function App() {
               gene={previewGene}
               centroidZ={liveMetrics.centroid_z}
               height={liveMetrics.height}
-              className="flex-1 w-full min-h-[min(68vh,780px)] lg:min-h-0 rounded-lg border border-slate-100 bg-slate-50 overflow-hidden"
+              className="flex-1 w-full min-h-0 h-full rounded-lg border border-slate-100 bg-slate-50 overflow-hidden"
             />
           </Panel>
         </div>

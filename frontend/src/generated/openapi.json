@@ -434,7 +434,7 @@
           "radii"
         ],
         "title": "Gene",
-        "description": "デザインの形状を正規化した表現。\n\n形状は、[0, height] 上の ``N`` 個の制御点 (z_i, radii[i]) による\n折れ線/スプライン r(z) プロファイルを z 軸回りに回転させた回転体として定義する。\nz_i の配置は ``z_warp`` で決まる:\n\n    z_i = height · (i / (N-1)) ** z_warp\n\n- ``z_warp=1.0`` ないし ``None``: 等間隔（v1 および旧 v2）\n- ``z_warp=2.0``: 二乗ワープ。z=0 付近にノードが密に集まり、球キャップの\n   √z 型特異点（極で傾き無限大）を忠実に再現できる。v2 では既定値。\n\nバージョン:\n- v1（旧）: radii[0] == bottom_radius（> 0、底は平円盤）、radii[-1] == 0、\n  z_warp は未設定（None → 等間隔扱い）。\n- v2（現行、GENE_VERSION=2）: radii[0] == 0（底は球キャップの極点）、\n  radii[-1] == rt（上端の丸め半径）、球キャップ+5次テーパのパラメトリック族\n  から生成され、θ_max=75° まで自己復元可能な形状のみ。z_warp=2.0。\n\n両バージョンとも radii は単峰（ある peak index までは単調増加、以降は単調減少）。"
+        "description": "デザインの形状を正規化した表現。\n\n形状は、[0, height] 上の ``N`` 個の制御点 (z_i, radii[i]) による\n折れ線/スプライン r(z) プロファイルを z 軸回りに回転させた回転体として定義する。\nz_i の配置は ``z_warp`` で決まる:\n\n    z_i = height · (i / (N-1)) ** z_warp\n\n- ``z_warp=1.0`` ないし ``None``: 等間隔（v1 および旧 v2）\n- ``z_warp=2.0``: 二乗ワープ。z=0 付近にノードが密に集まり、球キャップの\n   √z 型特異点（極で傾き無限大）を忠実に再現できる。v2 では既定値。\n\nバージョン:\n- v1（旧）: radii[0] == bottom_radius（> 0、底は平円盤）、radii[-1] == 0、\n  z_warp は未設定（None → 等間隔扱い）。\n- v2（現行、GENE_VERSION=2）: radii[0] == 0（底は球キャップの極点）、\n  radii[-1] == rt（上端の丸め半径）、球キャップ+5次テーパのパラメトリック族\n  から生成され、θ_max=75° まで自己復元可能な形状のみ。z_warp=2.0。\n\n両バージョンとも radii は単峰（ある peak index までは単調増加、以降は単調減少）。\n\n``top_extension_mm`` はベース形状（radii / height）を変えずに上方向へ\n付与する延長量（mm）。0 でベース形状のみ。"
       },
       "GenerateRequest": {
         "properties": {
@@ -520,33 +520,6 @@
         ],
         "title": "ListResponse"
       },
-      "PatchDesignRequest": {
-        "properties": {
-          "top_extension_mm": {
-            "type": "number",
-            "minimum": 0.0,
-            "title": "Top Extension Mm"
-          },
-          "top_cut_height_mm": {
-            "type": "number",
-            "minimum": 0.0,
-            "title": "Top Cut Height Mm"
-          },
-          "top_cut_angle_deg": {
-            "type": "number",
-            "maximum": 89.0,
-            "minimum": -89.0,
-            "title": "Top Cut Angle Deg"
-          }
-        },
-        "type": "object",
-        "required": [
-          "top_extension_mm",
-          "top_cut_height_mm",
-          "top_cut_angle_deg"
-        ],
-        "title": "PatchDesignRequest"
-      },
       "Metrics": {
         "properties": {
           "volume": {
@@ -596,6 +569,33 @@
           "centroid_z"
         ],
         "title": "Metrics"
+      },
+      "PatchDesignRequest": {
+        "properties": {
+          "top_extension_mm": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Top Extension Mm"
+          },
+          "top_cut_height_mm": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Top Cut Height Mm"
+          },
+          "top_cut_angle_deg": {
+            "type": "number",
+            "maximum": 89.0,
+            "minimum": -89.0,
+            "title": "Top Cut Angle Deg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "top_extension_mm",
+          "top_cut_height_mm",
+          "top_cut_angle_deg"
+        ],
+        "title": "PatchDesignRequest"
       },
       "ValidationError": {
         "properties": {

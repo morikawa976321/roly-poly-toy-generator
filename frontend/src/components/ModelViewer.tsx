@@ -8,6 +8,7 @@ type Props = {
   gene: Gene;
   centroidZ: number;
   height: number;
+  className?: string;
 };
 
 function ToyMesh({ gene }: { gene: Gene }) {
@@ -35,9 +36,17 @@ function CentroidMarker({
   );
 }
 
-export default function ModelViewer({ gene, centroidZ, height }: Props) {
+const defaultClassName =
+  "w-full h-[480px] rounded-lg border border-slate-200 bg-white overflow-hidden";
+
+export default function ModelViewer({
+  gene,
+  centroidZ,
+  height,
+  className = defaultClassName,
+}: Props) {
   return (
-    <div className="w-full h-[480px] rounded-lg border border-slate-200 bg-white overflow-hidden">
+    <div className={className}>
       <Canvas
         camera={{ position: [120, 120, 120], fov: 40, up: [0, 0, 1] }}
         dpr={[1, 2]}

@@ -5,7 +5,7 @@ import { cappedGeometryFromGene } from "./mesh";
 import { geneTopCutParams, signedCutDist } from "./meshPlaneCut";
 
 function posKey(
-  pos: THREE.BufferAttribute,
+  pos: THREE.BufferAttribute | THREE.InterleavedBufferAttribute,
   idx: number,
 ): string {
   return `${Math.round(pos.getX(idx) * 1e4)}:${Math.round(pos.getY(idx) * 1e4)}:${Math.round(pos.getZ(idx) * 1e4)}`;
