@@ -7,8 +7,6 @@ import ModelViewer from "../components/ModelViewer";
 import { geneWithModifications, computeMetrics } from "../derive/metrics";
 import { maxTopExtensionMm } from "../derive/profileExtension";
 import { thumbnailDataUrl } from "../derive/thumbnailSvg";
-import { cappedGeometryFromGene } from "../derive/mesh";
-import { exportGeometryToStlBlob } from "../derive/stlExporter";
 import { exportGeneToStepBlob } from "../derive/stepExporter";
 
 const PREVIEW_DEBOUNCE_MS = 1000;
@@ -94,19 +92,6 @@ export default function DetailPage() {
     if (!previewGene || !liveMetrics) return "";
     return thumbnailDataUrl(previewGene, liveMetrics);
   }, [previewGene, liveMetrics]);
-
-  const stlBlobUrl = useMemo(() => {
-    if (!previewGene) return "";
-    const geom = cappedGeometryFromGene(previewGene, 128);
-    const blob = exportGeometryToStlBlob(geom);
-    return URL.createObjectURL(blob);
-  }, [previewGene]);
-
-  useEffect(() => {
-    return () => {
-      if (stlBlobUrl) URL.revokeObjectURL(stlBlobUrl);
-    };
-  }, [stlBlobUrl]);
 
   useEffect(() => {
     if (stepBlobUrlRef.current) {
@@ -201,13 +186,6 @@ export default function DetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
             <div className="flex items-center justify-end gap-2 mb-2">
-              <a
-                href={stlBlobUrl}
-                download={`${data.design_id}.stl`}
-                className="inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
-              >
-                STL出力
-              </a>
               <button
                 type="button"
                 onClick={handleStepDownload}
