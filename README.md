@@ -340,3 +340,7 @@ roly-poly-toy-generator/
 ├── .python-version
 └── roly-poly-toy-generator.spec    # PyInstaller 設定（git 管理外）
 ```
+
+## バグ
+
+- 一様仮定時の重心と、起き上がるために必要な重心位置の計算に問題があり不正な値が表示されている
