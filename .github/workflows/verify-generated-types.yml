@@ -34,6 +34,10 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Build frontend (SPA routes in OpenAPI need dist/index.html)
+        working-directory: frontend
+        run: npm run build
+
       - name: Generate OpenAPI and TS types
         run: |
           python backend/scripts/export_openapi.py frontend/src/generated/openapi.json
