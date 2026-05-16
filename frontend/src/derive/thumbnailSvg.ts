@@ -1,29 +1,68 @@
 import type { Gene, Metrics } from "../types";
-import { smoothProfile } from "./smoothing";
+import {
+  cutProfileSilhouette,
+  cutWouldChangeProfile,
+  geneTopCutParams,
+} from "./meshPlaneCut";
+import { effectiveProfile } from "./profileExtension";
+
+/** 傾斜カット上面: x 軸上を z = z_cut + x·tan で結ぶ */
+function topCutEdgePoints(
+  xStart: number,
+  xEnd: number,
+  zCut: number,
+  tanA: number,
+  height: number,
+): Array<[number, number]> {
+  if (Math.abs(xStart - xEnd) < 1e-9) return [];
+  const n = Math.max(2, Math.min(48, Math.ceil(Math.abs(xStart - xEnd))));
+  const pts: Array<[number, number]> = [];
+  for (let i = 1; i < n; i++) {
+    const x = xStart + ((xEnd - xStart) * i) / n;
+    pts.push([x, height - (zCut + x * tanA)]);
+  }
+  return pts;
+}
 
 // backend/app/thumbnail.py::render_thumbnail_svg の TS ポート
 export function thumbnailSvg(gene: Gene, metrics: Metrics): string {
-  const { z, r } = smoothProfile(gene);
-  const height = Number(gene.height);
+  const { z, r } = effectiveProfile(gene);
+  const { zCut, tanA } = geneTopCutParams(gene);
+  const angleDeg = Number(gene.top_cut_angle_deg ?? 0);
+  const { zRight, rRight, zLeft, rLeft } = cutWouldChangeProfile(z, r, zCut, tanA)
+    ? cutProfileSilhouette(z, r, zCut, angleDeg)
+    : { zRight: z, rRight: r, zLeft: z, rLeft: r };
+
   let maxR = 0;
-  for (const v of r) maxR = Math.max(maxR, v);
-
-  // 右側を下→上、左側（符号反転）を上→下で閉じる
-  const xs: number[] = [];
-  const zs: number[] = [];
-  for (let i = 0; i < r.length; i++) {
-    xs.push(r[i]);
-    zs.push(z[i]);
+  let zMax = -Infinity;
+  let zMin = Infinity;
+  for (let i = 0; i < zRight.length; i++) {
+    maxR = Math.max(maxR, rRight[i]);
+    zMax = Math.max(zMax, zRight[i]);
+    zMin = Math.min(zMin, zRight[i]);
   }
-  for (let i = r.length - 1; i >= 0; i--) {
-    xs.push(-r[i]);
-    zs.push(z[i]);
+  for (let i = 0; i < zLeft.length; i++) {
+    maxR = Math.max(maxR, rLeft[i]);
+    zMax = Math.max(zMax, zLeft[i]);
+    zMin = Math.min(zMin, zLeft[i]);
   }
+  if (!Number.isFinite(zMax)) {
+    zMax = z[z.length - 1];
+    zMin = z[0];
+  }
+  const height = zMax;
 
-  // svg座標: y = height - z
   const pts: Array<[number, number]> = [];
-  for (let i = 0; i < xs.length; i++) {
-    pts.push([xs[i], height - zs[i]]);
+  for (let i = 0; i < zRight.length; i++) {
+    pts.push([rRight[i], height - zRight[i]]);
+  }
+  if (cutWouldChangeProfile(z, r, zCut, tanA) && zRight.length > 0 && zLeft.length > 0) {
+    const xRight = rRight[rRight.length - 1];
+    const xLeft = -rLeft[rLeft.length - 1];
+    pts.push(...topCutEdgePoints(xRight, xLeft, zCut, tanA, height));
+  }
+  for (let i = zLeft.length - 1; i >= 0; i--) {
+    pts.push([-rLeft[i], height - zLeft[i]]);
   }
 
   const pad = Math.max(2.0, 0.05 * Math.max(height, maxR * 2.0));
@@ -74,4 +113,3 @@ export function thumbnailDataUrl(gene: Gene, metrics: Metrics): string {
     .replace(/\"/g, "%22");
   return `data:image/svg+xml;charset=utf-8,${encoded}`;
 }
-

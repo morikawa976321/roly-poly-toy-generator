@@ -278,6 +278,9 @@ def sample_gene_with_feasibility(
             bottom_radius=0.0,  # v2 は底も r=0（球キャップ極点）
             radii=radii,
             z_warp=z_warp_v2,
+            top_extension_mm=0.0,
+            top_cut_height_mm=0.0,
+            top_cut_angle_deg=0.0,
         )
         return gene, feas
 

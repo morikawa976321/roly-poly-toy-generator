@@ -132,8 +132,7 @@ npm run package:windows
 ### 評価指標（Metrics）
 
 - `volume`（円錐台の総和）、`height`、`max_width`（= 2 × max(r)）、`centroid_z`（一様密度仮定、体積加重）
-- `z_cog_suggested`: θ_max=75° で復元するための推奨 CoG 高さ（safety_margin 込み）
-- `z_cog_max`: 自己復元できる z_CoG の上限
+- `z_cog_max`: 自己復元できる z_CoG の上限（0.85 安全率込み）
 - `bottom_curvature_radius`: 南極近傍の有効子午面曲率半径
 
 ### アセット生成（フロントエンド側）

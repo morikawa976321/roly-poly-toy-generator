@@ -20,12 +20,6 @@ export default function MetricsPanel({ metrics, designId, createdAt }: Props) {
       <Row label="max width (mm)" value={metrics.max_width.toFixed(3)} />
       <Row label="centroid_z (mm)" value={metrics.centroid_z.toFixed(3)} />
       <Row
-        label="z_cog_suggested (mm)"
-        value={
-          metrics.z_cog_suggested == null ? "na" : metrics.z_cog_suggested.toFixed(3)
-        }
-      />
-      <Row
         label="bottom_curvature_radius (mm)"
         value={
           metrics.bottom_curvature_radius == null

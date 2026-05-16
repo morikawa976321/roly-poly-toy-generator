@@ -179,6 +179,53 @@
             }
           }
         }
+      },
+      "patch": {
+        "summary": "Patch Design Endpoint",
+        "operationId": "patch_design_endpoint_api_designs__design_id__patch",
+        "parameters": [
+          {
+            "name": "design_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Design Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchDesignRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/health": {
@@ -361,6 +408,21 @@
               }
             ],
             "title": "Z Warp"
+          },
+          "top_extension_mm": {
+            "type": "number",
+            "title": "Top Extension Mm",
+            "default": 0.0
+          },
+          "top_cut_height_mm": {
+            "type": "number",
+            "title": "Top Cut Height Mm",
+            "default": 0.0
+          },
+          "top_cut_angle_deg": {
+            "type": "number",
+            "title": "Top Cut Angle Deg",
+            "default": 0.0
           }
         },
         "type": "object",
@@ -458,6 +520,33 @@
         ],
         "title": "ListResponse"
       },
+      "PatchDesignRequest": {
+        "properties": {
+          "top_extension_mm": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Top Extension Mm"
+          },
+          "top_cut_height_mm": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Top Cut Height Mm"
+          },
+          "top_cut_angle_deg": {
+            "type": "number",
+            "maximum": 89.0,
+            "minimum": -89.0,
+            "title": "Top Cut Angle Deg"
+          }
+        },
+        "type": "object",
+        "required": [
+          "top_extension_mm",
+          "top_cut_height_mm",
+          "top_cut_angle_deg"
+        ],
+        "title": "PatchDesignRequest"
+      },
       "Metrics": {
         "properties": {
           "volume": {
@@ -475,17 +564,6 @@
           "centroid_z": {
             "type": "number",
             "title": "Centroid Z"
-          },
-          "z_cog_suggested": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Z Cog Suggested"
           },
           "bottom_curvature_radius": {
             "anyOf": [

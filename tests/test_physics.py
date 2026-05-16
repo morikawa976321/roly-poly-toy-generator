@@ -139,7 +139,7 @@ def test_feasibility_realistic_cap_shape_is_feasible():
     height, z_com, z_dense, r_dense = tune_height_for_delta(params)
     feas = feasibility_from_profile(z_dense, r_dense, theta_max_deg=TILT_MAX_DEG)
     assert feas.is_feasible, feas
-    assert feas.suggested_z_cog > 0.0
+    assert feas.z_cog_max > 0.0
     # 底曲率半径は rb にほぼ一致（±20% 以内。テーパとの接続で平滑化される）
     assert abs(feas.rho_m_bottom - params.rb) / params.rb < 0.2
 
@@ -199,7 +199,7 @@ def test_rolypoly_feasibility_on_generated_gene_has_plausible_bottom_curvature()
     少なくとも底部曲率半径 ``rho_m_bottom`` は正で、SPHERE_RB の値域内に入る。
 
     is_feasible 自体の真値は生成時の feasibility（密プロファイル上の判定）で
-    求め、DB に保存された ``suggested_z_cog`` を信頼する。
+    求め、DB に保存された feasibility と整合する。
     """
     from backend.app.config import SPHERE_RB_MAX_MM, SPHERE_RB_MIN_MM
     from backend.app.gene import sample_gene_with_feasibility

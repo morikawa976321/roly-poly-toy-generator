@@ -18,6 +18,9 @@ function makeGene(
     bottom_radius: 0.0,
     radii,
     z_warp,
+    top_extension_mm: 0,
+    top_cut_height_mm: 0,
+    top_cut_angle_deg: 0,
   };
 }
 

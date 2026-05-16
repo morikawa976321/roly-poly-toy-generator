@@ -30,6 +30,23 @@ export function getDesign(
   );
 }
 
+export type PatchDesignPayload = {
+  top_extension_mm: number;
+  top_cut_height_mm: number;
+  top_cut_angle_deg: number;
+};
+
+export function patchDesign(
+  designId: string,
+  payload: PatchDesignPayload,
+): Promise<DesignDetail> {
+  return jsonFetch<DesignDetail>(`/api/designs/${designId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export function generateDesigns(
   n?: number,
   parentIds?: string[],

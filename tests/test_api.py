@@ -37,7 +37,6 @@ def _make_metrics(**overrides) -> Metrics:
         height=30.0,
         max_width=20.0,
         centroid_z=10.0,
-        z_cog_suggested=5.0,
         bottom_curvature_radius=25.0,
         z_cog_max=12.5,
     )
@@ -92,8 +91,74 @@ def test_get_design_response_matches_design_detail(
     assert body["design_id"] == "abc123"
     assert body["gene"] == gene.model_dump(mode="json")
     assert body["metrics"]["volume"] == metrics.volume
-    assert body["metrics"]["z_cog_suggested"] == metrics.z_cog_suggested
+    assert "z_cog_suggested" not in body["metrics"]
     assert body["created_at"] == created_at
+
+
+def test_patch_design_updates_extension(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from backend.app.profile_extension import max_top_extension_mm
+
+    gene = _make_gene(top_extension_mm=0.0)
+    metrics = _make_metrics()
+    created_at = "2026-04-24T12:00:00+00:00"
+    stored = {"gene": gene, "metrics": metrics}
+
+    def fake_get_design(design_id: str):
+        if design_id != "abc123":
+            return None
+        return (stored["gene"], stored["metrics"], created_at)
+
+    def fake_update(design_id: str, g, m):
+        stored["gene"] = g
+        stored["metrics"] = m
+        from backend.app.models import DesignSummary
+
+        return DesignSummary(
+            design_id=design_id, gene=g, metrics=m, created_at=created_at
+        )
+
+    monkeypatch.setattr("backend.app.api.get_design", fake_get_design)
+    monkeypatch.setattr("backend.app.api.update_design", fake_update)
+
+    import math
+
+    from backend.app.models import Gene as GeneModel
+
+    n = 36
+    radii = [0.0]
+    for i in range(1, n - 1):
+        t = i / (n - 1)
+        radii.append(20.0 * math.sin(math.pi * t))
+    radii.append(2.0)
+    rich_gene = GeneModel(
+        version=2,
+        N=n,
+        height=50.0,
+        bottom_radius=0.0,
+        radii=radii,
+        z_warp=2.0,
+        top_extension_mm=0.0,
+    )
+    stored["gene"] = rich_gene
+    stored["metrics"] = _make_metrics(height=50.0)
+
+    d_max = max_top_extension_mm(rich_gene)
+    assert d_max > 0.5
+    ext = min(2.0, d_max)
+    r = client.patch(
+        "/api/designs/abc123",
+        json={
+            "top_extension_mm": ext,
+            "top_cut_height_mm": 0.0,
+            "top_cut_angle_deg": 0.0,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["gene"]["top_extension_mm"] == ext
+    assert body["metrics"]["height"] > 50.0
 
 
 # ------------------------ POST /api/designs/generate --------------------

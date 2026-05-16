@@ -57,18 +57,17 @@ def test_bulk_sample_all_feasible():
     N が大きすぎるとテストが遅いので、中程度の 100 個にする。
     """
     N = 100
-    z_cog_suggested = []
+    z_cog_max_vals = []
     for seed in range(N):
         gene, feas = sample_gene_with_feasibility(seed=seed)
         assert feas.is_feasible, (seed, feas)
-        assert feas.suggested_z_cog > 0.0
+        assert feas.z_cog_max > 0.0
         assert feas.worst_margin > 0.0
         assert gene.version == GENE_VERSION
-        z_cog_suggested.append(feas.suggested_z_cog)
+        assert gene.top_extension_mm == 0.0
+        z_cog_max_vals.append(feas.z_cog_max)
 
-    # suggested_z_cog が常に rb の数分の一〜半分程度の範囲に入る
-    # （ここでは単にバリエーションがあること = 定数でないことを確認）
-    arr = np.asarray(z_cog_suggested)
+    arr = np.asarray(z_cog_max_vals)
     assert arr.std() > 0.1
 
 
@@ -115,8 +114,8 @@ def test_breed_gene_with_feasibility_basic():
         feas2 = rolypoly_feasibility(g)
         assert feas2.is_feasible
         assert feas2.z_cog_max == pytest.approx(feas.z_cog_max, rel=0.0, abs=0.0)
-        assert feas2.suggested_z_cog == pytest.approx(feas.suggested_z_cog, rel=0.0, abs=0.0)
         assert feas2.rho_m_bottom == pytest.approx(feas.rho_m_bottom, rel=0.0, abs=0.0)
+        assert g.top_extension_mm == 0.0
         assert g.version == GENE_VERSION
         assert g.N == N_NODES
         assert g.bottom_radius == 0.0

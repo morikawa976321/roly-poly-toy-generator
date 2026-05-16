@@ -73,7 +73,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Patch Design Endpoint */
+        patch: operations["patch_design_endpoint_api_designs__design_id__patch"];
         trace?: never;
     };
     "/health": {
@@ -196,6 +197,21 @@ export interface components {
             radii: number[];
             /** Z Warp */
             z_warp?: number | null;
+            /**
+             * Top Extension Mm
+             * @default 0
+             */
+            top_extension_mm: number;
+            /**
+             * Top Cut Height Mm
+             * @default 0
+             */
+            top_cut_height_mm: number;
+            /**
+             * Top Cut Angle Deg
+             * @default 0
+             */
+            top_cut_angle_deg: number;
         };
         /** GenerateRequest */
         GenerateRequest: {
@@ -221,6 +237,15 @@ export interface components {
             /** Total */
             total: number;
         };
+        /** PatchDesignRequest */
+        PatchDesignRequest: {
+            /** Top Extension Mm */
+            top_extension_mm: number;
+            /** Top Cut Height Mm */
+            top_cut_height_mm: number;
+            /** Top Cut Angle Deg */
+            top_cut_angle_deg: number;
+        };
         /** Metrics */
         Metrics: {
             /** Volume */
@@ -231,8 +256,6 @@ export interface components {
             max_width: number;
             /** Centroid Z */
             centroid_z: number;
-            /** Z Cog Suggested */
-            z_cog_suggested?: number | null;
             /** Bottom Curvature Radius */
             bottom_curvature_radius?: number | null;
             /** Z Cog Max */
@@ -377,6 +400,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_design_endpoint_api_designs__design_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchDesignRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

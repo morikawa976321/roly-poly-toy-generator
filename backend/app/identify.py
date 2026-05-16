@@ -31,6 +31,10 @@ def _round_floats(obj: Any, decimals: int) -> Any:
 
 def canonical_gene_dict(gene: Gene) -> Dict[str, Any]:
     raw = gene.model_dump()
+    # 延長量は保存用パラメータであり、形状本体の ID には含めない。
+    raw.pop("top_extension_mm", None)
+    raw.pop("top_cut_height_mm", None)
+    raw.pop("top_cut_angle_deg", None)
     return _round_floats(raw, GENE_FLOAT_DECIMALS)
 
 

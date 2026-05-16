@@ -10,10 +10,39 @@
  */
 
 import type { Gene } from "../types";
-import { smoothProfile } from "./smoothing";
+import { effectiveProfile } from "./profileExtension";
+import { cutWouldChangeMesh, geneTopCutParams, topCutTanAngle } from "./meshPlaneCut";
+import { revolutionGeometryFromGene } from "./mesh";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let ocPromise: Promise<any> | null = null;
+
+/** 回転体ソリッドを z <= z_cut + x·tan(θ) の半空間で切る（OCCT Boolean） */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyStepPlaneCut(
+  oc: any,
+  solid: any,
+  zCut: number,
+  angleDeg: number,
+  t: <T>(obj: T) => T,
+): any {
+  const tanA = topCutTanAngle(angleDeg);
+  const nlen = Math.hypot(tanA, 1);
+  const dir = t(new oc.gp_Dir_4(-tanA / nlen, 0, 1 / nlen));
+  const pln = t(new oc.gp_Pln_3(new oc.gp_Pnt_3(0, 0, zCut), dir));
+
+  const mkFace = t(new oc.BRepBuilderAPI_MakeFace_2(pln, -500, 500, -500, 500));
+  const face = mkFace.Face();
+
+  const refPt = t(new oc.gp_Pnt_3(0, 0, Math.max(0, zCut - 10)));
+  const mkHalf = t(new oc.BRepPrimAPI_MakeHalfSpace_2(face, refPt));
+  const halfSolid = mkHalf.Solid();
+
+  const CutCtor = oc.BRepAlgoAPI_Cut_3 ?? oc.BRepAlgoAPI_Cut;
+  const cut = t(new CutCtor(solid, halfSolid, new oc.Message_ProgressRange_1()));
+  cut.Build(new oc.Message_ProgressRange_1());
+  return cut.Shape();
+}
 
 /**
  * opencascade.js の WASM インスタンスを lazy-load する。
@@ -53,7 +82,7 @@ function getOC(): Promise<any> {
 export async function exportGeneToStepBlob(gene: Gene): Promise<Blob> {
   const oc = await getOC();
 
-  const { z, r } = smoothProfile(gene);
+  const { z, r } = effectiveProfile(gene);
 
   // ---------- プロファイル点列を収集 ----------
   // r=0 近傍（軸上）の点はスキップし、r > eps の区間のみ使用。
@@ -128,7 +157,14 @@ export async function exportGeneToStepBlob(gene: Gene): Promise<Blob> {
     const revolMaker = t(
       new oc.BRepPrimAPI_MakeRevol_1(face, axis, 2 * Math.PI, true),
     );
-    const solid = revolMaker.Shape();
+    let solid = revolMaker.Shape();
+
+    const { zCut, tanA } = geneTopCutParams(gene);
+    const angleDeg = (Math.atan(tanA) * 180) / Math.PI;
+    const revGeom = revolutionGeometryFromGene(gene, 64);
+    if (cutWouldChangeMesh(revGeom, zCut, tanA)) {
+      solid = applyStepPlaneCut(oc, solid, zCut, angleDeg, t);
+    }
 
     // ---------- STEP 出力 ----------
     // opencascade.js のバージョンによりコンストラクタ名のサフィックスが異なる

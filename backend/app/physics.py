@@ -86,9 +86,6 @@ class Feasibility:
     rho_m_bottom: float
     """南極近傍での有効曲率半径（mm）。~= 球キャップ半径。"""
 
-    suggested_z_cog: float
-    """設計値として推奨する z_CoG（mm）。通常は z_cog_max/2。"""
-
     worst_margin: float
     """もっとも厳しい接地点での ρ_eff - (z_CoG=0 時の投影距離) の最小値（mm）。負なら不合格。"""
 
@@ -125,7 +122,6 @@ def feasibility_from_profile(
             z_cog_max=0.0,
             limiting_z=0.0,
             rho_m_bottom=0.0,
-            suggested_z_cog=0.0,
             worst_margin=float("-inf"),
         )
 
@@ -137,7 +133,6 @@ def feasibility_from_profile(
             z_cog_max=0.0,
             limiting_z=0.0,
             rho_m_bottom=0.0,
-            suggested_z_cog=0.0,
             worst_margin=float("-inf"),
         )
 
@@ -179,7 +174,6 @@ def feasibility_from_profile(
             z_cog_max=0.0,
             limiting_z=0.0,
             rho_m_bottom=float(np.median(rho_pos)) if rho_pos.size else 0.0,
-            suggested_z_cog=0.0,
             worst_margin=float("-inf"),
         )
 
@@ -208,14 +202,12 @@ def feasibility_from_profile(
 
     is_feasible = z_cog_max_raw > 0.0 and worst_margin > 0.0
     z_cog_max = max(0.0, z_cog_max_raw) * safety_margin
-    suggested = 0.5 * z_cog_max if is_feasible else 0.0
 
     return Feasibility(
         is_feasible=is_feasible,
         z_cog_max=z_cog_max,
         limiting_z=limiting_z,
         rho_m_bottom=rho_m_bottom,
-        suggested_z_cog=suggested,
         worst_margin=worst_margin,
     )
 
@@ -233,41 +225,23 @@ def rolypoly_feasibility(
     生成時に付けた摂動が False Negative に結び付きにくい。
 
     ただし **生成時の値より保守的** な結果になることがある（平滑化で曲率が少し
-    緩くなり、z_cog_max が小さめに出る傾向）。正確な値が欲しい場合は、生成時に
-    ``feasibility_from_profile(z_dense, r_dense)`` で計算し、DB に保存された
-    ``suggested_z_cog`` を使う。
+    緩くなり、z_cog_max が小さめに出る傾向）。
     """
-    radii = np.asarray(gene.radii, dtype=float)
-    height = float(gene.height)
-    n = len(radii)
+    from .profile_extension import effective_profile
+
+    z_dense, r_dense = effective_profile(gene)
+    n = len(z_dense)
     if n < 6:
         return Feasibility(
             is_feasible=False, z_cog_max=0.0, limiting_z=0.0,
-            rho_m_bottom=0.0, suggested_z_cog=0.0, worst_margin=float("-inf"),
+            rho_m_bottom=0.0, worst_margin=float("-inf"),
         )
 
-    # radii の z 配置規則: z_i = height · (i/(N-1))**alpha
-    alpha_raw = getattr(gene, "z_warp", None)
-    alpha = float(alpha_raw) if alpha_raw is not None and float(alpha_raw) > 0.0 else 1.0
-    u_nodes = np.linspace(0.0, 1.0, n)
-    z_nodes = height * (u_nodes ** alpha)
-
-    # radii は離散なので、同じ規則で dense な z を作り、線形補間で r(z) を作る。
-    n_dense = 513
-    u_dense = np.linspace(0.0, 1.0, n_dense)
-    z_dense = height * (u_dense ** alpha)
-    r_dense = np.interp(z_dense, z_nodes, radii)
-
-    # jitter を抑えるため、r 自体にも軽く Gaussian を掛ける（端は nearest）。
-    sigma_r = max(1.0, n_dense / 140.0)
-    r_dense = _gaussian_filter1d(r_dense, sigma=sigma_r)
-
-    # 導関数は feasibility_from_profile 側でさらに平滑化できる。
     return feasibility_from_profile(
         z_dense,
         r_dense,
         theta_max_deg=theta_max_deg,
         eps_mm=eps_mm,
         safety_margin=safety_margin,
-        smooth_derivatives=True,
+        smooth_derivatives=False,
     )

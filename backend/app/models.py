@@ -28,6 +28,9 @@ class Gene(BaseModel):
       から生成され、θ_max=75° まで自己復元可能な形状のみ。z_warp=2.0。
 
     両バージョンとも radii は単峰（ある peak index までは単調増加、以降は単調減少）。
+
+    ``top_extension_mm`` はベース形状（radii / height）を変えずに上方向へ
+    付与する延長量（mm）。0 でベース形状のみ。
     """
 
     version: int
@@ -45,19 +48,21 @@ class Gene(BaseModel):
     球キャップの極での √z 型特異点を忠実に表現する（v2 既定）。
     """
 
+    top_extension_mm: float = 0.0
+    """ベース形状の上端からの延長量（mm）。design_id ハッシュには含めない。"""
+
+    top_cut_height_mm: float = 0.0
+    """斜めカット平面が z 軸と交わる高さ（mm）。design_id ハッシュには含めない。"""
+
+    top_cut_angle_deg: float = 0.0
+    """カット平面の傾き（度, 水平=0）。正で外側ほど z 上限が高い。design_id には含めない。"""
+
 
 class Metrics(BaseModel):
     volume: float
     height: float
     max_width: float
     centroid_z: float
-
-    z_cog_suggested: Optional[float] = None
-    """起き上がりこぼしとして推奨される重心高さ（mm）。
-
-    物理的安定条件（接地点の曲率中心より下）を満たす z_CoG の上限を取り、
-    その半分を推奨値とする。None の場合は未計算 or v1 gene（feasibility 判定なし）。
-    """
 
     bottom_curvature_radius: Optional[float] = None
     """南極近傍の有効曲率半径（mm）。v2 gene では rb にほぼ等しい。"""
@@ -103,3 +108,9 @@ class ListResponse(BaseModel):
 
 class DeleteAllResponse(BaseModel):
     deleted: int
+
+
+class PatchDesignRequest(BaseModel):
+    top_extension_mm: float = Field(ge=0.0)
+    top_cut_height_mm: float = Field(ge=0.0)
+    top_cut_angle_deg: float = Field(ge=-89.0, le=89.0)

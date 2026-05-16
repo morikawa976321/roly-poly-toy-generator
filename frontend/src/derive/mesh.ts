@@ -1,6 +1,7 @@
 import type { Gene } from "../types";
 import * as THREE from "three";
-import { smoothProfile } from "./smoothing";
+import { effectiveProfile } from "./profileExtension";
+import { clipGeneMesh } from "./meshPlaneCut";
 
 function revolveWatertightGeometry(
   zLine: number[],
@@ -118,11 +119,19 @@ export function latheGeometryFromGene(
   return cappedGeometryFromGene(gene, radialSegments);
 }
 
+export function revolutionGeometryFromGene(
+  gene: Gene,
+  radialSegments = 128,
+): THREE.BufferGeometry {
+  const { z, r } = effectiveProfile(gene);
+  return revolveWatertightGeometry(z, r, radialSegments, 1e-6);
+}
+
 export function cappedGeometryFromGene(
   gene: Gene,
   radialSegments = 128,
 ): THREE.BufferGeometry {
-  const { z, r } = smoothProfile(gene);
-  return revolveWatertightGeometry(z, r, radialSegments, 1e-6);
+  const geom = revolutionGeometryFromGene(gene, radialSegments);
+  return clipGeneMesh(geom, gene);
 }
 

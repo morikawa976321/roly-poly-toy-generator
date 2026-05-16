@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Bounds, OrbitControls } from "@react-three/drei";
 import type { Gene } from "../types";
-import { latheGeometryFromGene } from "../derive/mesh";
+import { cappedGeometryFromGene } from "../derive/mesh";
 
 type Props = {
   gene: Gene;
@@ -11,7 +11,7 @@ type Props = {
 };
 
 function ToyMesh({ gene }: { gene: Gene }) {
-  const geom = useMemo(() => latheGeometryFromGene(gene, 128), [gene]);
+  const geom = useMemo(() => cappedGeometryFromGene(gene, 128), [gene]);
   return (
     <mesh geometry={geom} castShadow receiveShadow>
       <meshStandardMaterial color="#94a3b8" metalness={0.05} roughness={0.9} />

@@ -69,7 +69,6 @@ def _row_to_metrics(row: dict[str, Any]) -> Metrics:
         height=float(row["height"]),
         max_width=float(row["max_width"]),
         centroid_z=float(row["centroid_z"]),
-        z_cog_suggested=row.get("z_cog_suggested", None),
         bottom_curvature_radius=row.get("bottom_curvature_radius", None),
         z_cog_max=row.get("z_cog_max", None),
     )
@@ -96,7 +95,7 @@ def upsert_design(
         float(metrics.height),
         float(metrics.max_width),
         float(metrics.centroid_z),
-        metrics.z_cog_suggested,
+        None,
         metrics.bottom_curvature_radius,
         metrics.z_cog_max,
         _now_iso(),
@@ -194,3 +193,48 @@ def delete_all_designs() -> int:
         count = int(con.execute(f"SELECT COUNT(*) FROM {TABLE}").fetchone()[0])
         con.execute(f"DELETE FROM {TABLE}")
     return count
+
+
+def update_design(
+    design_id: str,
+    gene: Gene,
+    metrics: Metrics,
+) -> Optional[DesignSummary]:
+    """既存デザインの gene / metrics を上書きする（design_id / created_at は不変）。"""
+    with _connect() as con:
+        row = con.execute(
+            f"SELECT created_at FROM {TABLE} WHERE design_id = ? LIMIT 1",
+            (design_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        created_at = row["created_at"]
+        con.execute(
+            f"""
+            UPDATE {TABLE}
+            SET gene_json = ?,
+                volume = ?,
+                height = ?,
+                max_width = ?,
+                centroid_z = ?,
+                bottom_curvature_radius = ?,
+                z_cog_max = ?
+            WHERE design_id = ?
+            """,
+            (
+                json.dumps(gene.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":")),
+                float(metrics.volume),
+                float(metrics.height),
+                float(metrics.max_width),
+                float(metrics.centroid_z),
+                metrics.bottom_curvature_radius,
+                metrics.z_cog_max,
+                design_id,
+            ),
+        )
+    return DesignSummary(
+        design_id=design_id,
+        gene=gene,
+        metrics=metrics,
+        created_at=created_at,
+    )
