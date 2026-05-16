@@ -1,0 +1,33 @@
+{
+  "name": "roly-poly-design-viewer",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "sync-core": "node ./scripts/sync-core-derive.mjs",
+    "dev": "npm run sync-core && vite",
+    "build": "npm run sync-core && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "sync-design": "node ./scripts/sync-design.mjs"
+  },
+  "dependencies": {
+    "@react-three/drei": "^9.114.3",
+    "@react-three/fiber": "^8.17.9",
+    "opencascade.js": "^1.1.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "three": "^0.169.0",
+    "vite-plugin-wasm": "^3.6.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^25.6.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "@types/three": "^0.169.0",
+    "@vitejs/plugin-react": "^4.3.2",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}
