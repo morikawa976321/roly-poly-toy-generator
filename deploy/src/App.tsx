@@ -11,6 +11,15 @@ import ModelViewer from "@core/components/ModelViewer";
 import { geneWithModifications, computeMetrics } from "@core/derive/metrics";
 import { maxTopExtensionMm } from "@core/derive/profileExtension";
 import { thumbnailDataUrl } from "@core/derive/thumbnailSvg";
+import {
+  ensureEffectiveProfile,
+  initB3Pyodide,
+} from "@core/derive/ensureB3Profile";
+import {
+  getB3ProfileCacheVersion,
+  getEffectiveProfile,
+  subscribeB3ProfileCache,
+} from "@core/derive/b3ProfileCache";
 import { exportGeneToStepBlob } from "./derive/stepExporter";
 import designData from "./design.json";
 
@@ -69,18 +78,40 @@ export default function App() {
   const [stepLoading, setStepLoading] = useState(false);
   const stepBlobUrlRef = useRef<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [b3Ready, setB3Ready] = useState(false);
+  const [b3LoadError, setB3LoadError] = useState<string | null>(null);
+  const [profileVersion, setProfileVersion] = useState(0);
+
+  useEffect(() => subscribeB3ProfileCache(() => setProfileVersion(getB3ProfileCacheVersion())), []);
 
   useEffect(() => {
-    const params: PreviewParams = {
-      extensionMm: maxTopExtensionMm(data.gene),
-      cutHeightMm: Number(data.gene.top_cut_height_mm ?? 0),
-      cutAngleDeg: Number(data.gene.top_cut_angle_deg ?? 0),
+    let cancelled = false;
+    void (async () => {
+      try {
+        await initB3Pyodide();
+        await ensureEffectiveProfile(data.gene);
+        if (cancelled) return;
+        setB3Ready(true);
+        const params: PreviewParams = {
+          extensionMm: maxTopExtensionMm(data.gene),
+          cutHeightMm: Number(data.gene.top_cut_height_mm ?? 0),
+          cutAngleDeg: Number(data.gene.top_cut_angle_deg ?? 0),
+        };
+        setDraftExtensionMm(params.extensionMm);
+        setDraftCutHeightMm(params.cutHeightMm);
+        setDraftCutAngleDeg(params.cutAngleDeg);
+        setDebouncedPreview(params);
+        setInitialized(true);
+      } catch (e) {
+        if (!cancelled) {
+          setB3LoadError(e instanceof Error ? e.message : String(e));
+          setInitialized(true);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-    setDraftExtensionMm(params.extensionMm);
-    setDraftCutHeightMm(params.cutHeightMm);
-    setDraftCutAngleDeg(params.cutAngleDeg);
-    setDebouncedPreview(params);
-    setInitialized(true);
   }, [data]);
 
   useEffect(() => {
@@ -104,28 +135,52 @@ export default function App() {
     );
   }, [data, debouncedPreview]);
 
-  const maxExtensionMm = useMemo(() => maxTopExtensionMm(data.gene), [data]);
-
-  const profileTopMm = useMemo(() => {
-    const m = computeMetrics({
-      ...previewGene,
-      top_cut_height_mm: 0,
-      top_cut_angle_deg: 0,
+  useEffect(() => {
+    if (!b3Ready) return;
+    void ensureEffectiveProfile(previewGene).catch((e) => {
+      setB3LoadError(e instanceof Error ? e.message : String(e));
     });
-    return m.height;
-  }, [previewGene]);
+  }, [b3Ready, previewGene]);
 
-  const liveMetrics = useMemo(() => computeMetrics(previewGene), [previewGene]);
-
-  const detailThumbUrl = useMemo(
-    () => thumbnailDataUrl(previewGene, liveMetrics),
-    [previewGene, liveMetrics],
+  const maxExtensionMm = useMemo(
+    () => (b3Ready ? maxTopExtensionMm(data.gene) : 0),
+    [data, b3Ready, profileVersion],
   );
 
+  const profileTopMm = useMemo(() => {
+    if (!b3Ready || !getEffectiveProfile(previewGene)) return 0;
+    try {
+      const m = computeMetrics({
+        ...previewGene,
+        top_cut_height_mm: 0,
+        top_cut_angle_deg: 0,
+      });
+      return m.height;
+    } catch {
+      return 0;
+    }
+  }, [previewGene, b3Ready, profileVersion]);
+
+  const liveMetrics = useMemo(() => {
+    if (!b3Ready || !getEffectiveProfile(previewGene)) return null;
+    try {
+      return computeMetrics(previewGene);
+    } catch {
+      return null;
+    }
+  }, [previewGene, b3Ready, profileVersion]);
+
+  const detailThumbUrl = useMemo(() => {
+    if (!b3Ready || !liveMetrics) return "";
+    return thumbnailDataUrl(previewGene, liveMetrics);
+  }, [previewGene, liveMetrics, b3Ready, profileVersion]);
+
   const handleStepDownload = useCallback(async () => {
+    if (!b3Ready) return;
     setStepLoading(true);
     setError(null);
     try {
+      await ensureEffectiveProfile(previewGene);
       const blob = await exportGeneToStepBlob(previewGene);
       const url = URL.createObjectURL(blob);
       if (stepBlobUrlRef.current) URL.revokeObjectURL(stepBlobUrlRef.current);
@@ -143,7 +198,7 @@ export default function App() {
     } finally {
       setStepLoading(false);
     }
-  }, [data.design_id, previewGene]);
+  }, [data.design_id, previewGene, b3Ready]);
 
   useEffect(() => {
     return () => {
@@ -151,10 +206,10 @@ export default function App() {
     };
   }, []);
 
-  if (!initialized) {
+  if (!initialized || !b3Ready || !liveMetrics || !getEffectiveProfile(previewGene)) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-slate-500">
-        Loading...
+        {b3LoadError ?? "B3 プロファイルを準備しています…"}
       </div>
     );
   }
@@ -281,6 +336,7 @@ export default function App() {
               gene={previewGene}
               centroidZ={liveMetrics.centroid_z}
               height={liveMetrics.height}
+              profileVersion={profileVersion}
               className="flex-1 w-full min-h-0 h-full rounded-lg border border-slate-100 bg-slate-50 overflow-hidden"
             />
           </Panel>

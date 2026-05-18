@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import type { DesignSummary } from "../types";
 import { deleteAllDesigns, generateDesigns, listDesigns } from "../api";
 import DesignCard from "../components/DesignCard";
+import { ensureEffectiveProfile, initB3Pyodide } from "../derive/ensureB3Profile";
+
+const THUMB_PREFETCH_CONCURRENCY = 6;
 
 export default function GalleryPage() {
   const [designs, setDesigns] = useState<DesignSummary[]>([]);
@@ -11,6 +14,8 @@ export default function GalleryPage() {
   const [deletingAll, setDeletingAll] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [b3Ready, setB3Ready] = useState(false);
+  const [b3Error, setB3Error] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -19,7 +24,14 @@ export default function GalleryPage() {
       const res = await listDesigns(200, 0);
       setDesigns(res.designs);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes("404")) {
+        setError(
+          "API に接続できません。ポート 8000 が別アプリに使われている可能性があります。`npm run stop` のあと `npm run dev` を再実行してください。",
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -28,6 +40,42 @@ export default function GalleryPage() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        await initB3Pyodide();
+        if (!cancelled) setB3Ready(true);
+      } catch (e) {
+        if (!cancelled) {
+          setB3Error(e instanceof Error ? e.message : String(e));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!b3Ready || designs.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      for (let i = 0; i < designs.length; i += THUMB_PREFETCH_CONCURRENCY) {
+        if (cancelled) return;
+        const chunk = designs.slice(i, i + THUMB_PREFETCH_CONCURRENCY);
+        await Promise.all(
+          chunk.map((d) =>
+            ensureEffectiveProfile(d.gene).catch(() => undefined),
+          ),
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [b3Ready, designs]);
 
   const toggleSelect = (designId: string) => {
     setSelectedIds((prev) => {
@@ -104,9 +152,9 @@ export default function GalleryPage() {
         </div>
       </div>
 
-      {error && (
+      {(error || b3Error) && (
         <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          {error ?? b3Error}
         </div>
       )}
 
@@ -120,6 +168,7 @@ export default function GalleryPage() {
             <DesignCard
               key={d.design_id}
               design={d}
+              b3Ready={b3Ready}
               selected={selectedIds.includes(d.design_id)}
               onToggleSelect={toggleSelect}
             />

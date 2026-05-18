@@ -1,15 +1,43 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { DesignSummary } from "../types";
+import {
+  getEffectiveProfile,
+  getB3ProfileCacheVersion,
+  subscribeB3ProfileCache,
+} from "../derive/b3ProfileCache";
+import { ensureEffectiveProfile } from "../derive/ensureB3Profile";
 import { thumbnailDataUrl } from "../derive/thumbnailSvg";
 
 type Props = {
   design: DesignSummary;
   selected?: boolean;
   onToggleSelect?: (designId: string) => void;
+  b3Ready?: boolean;
 };
 
-export default function DesignCard({ design, selected, onToggleSelect }: Props) {
+export default function DesignCard({
+  design,
+  selected,
+  onToggleSelect,
+  b3Ready = false,
+}: Props) {
   const { design_id, gene, metrics } = design;
+  const [, setCacheTick] = useState(0);
+
+  useEffect(
+    () => subscribeB3ProfileCache(() => setCacheTick(getB3ProfileCacheVersion())),
+    [],
+  );
+
+  useEffect(() => {
+    if (!b3Ready) return;
+    void ensureEffectiveProfile(gene);
+  }, [b3Ready, gene, design_id]);
+
+  const thumbSrc = getEffectiveProfile(gene)
+    ? thumbnailDataUrl(gene, metrics)
+    : null;
   return (
     <Link
       to={`/designs/${design_id}`}
@@ -39,11 +67,18 @@ export default function DesignCard({ design, selected, onToggleSelect }: Props) 
         </button>
       )}
       <div className="aspect-square bg-slate-100 flex items-center justify-center">
-        <img
-          src={thumbnailDataUrl(gene, metrics)}
-          alt={design_id}
-          className="max-h-full max-w-full p-2"
-        />
+        {thumbSrc ? (
+          <img
+            src={thumbSrc}
+            alt={design_id}
+            className="max-h-full max-w-full p-2"
+          />
+        ) : (
+          <div
+            aria-hidden
+            className="h-3/4 w-3/4 rounded-md bg-slate-200 animate-pulse"
+          />
+        )}
       </div>
       <div className="px-3 py-2 text-xs text-slate-600 border-t border-slate-200">
         <div className="font-mono truncate">{design_id}</div>

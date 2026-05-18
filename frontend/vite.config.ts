@@ -6,7 +6,7 @@ import wasm from "vite-plugin-wasm";
 export default defineConfig({
   plugins: [react(), tailwindcss(), wasm()],
   optimizeDeps: {
-    exclude: ["opencascade.js"],
+    exclude: ["opencascade.js", "pyodide"],
   },
   server: {
     port: 5173,

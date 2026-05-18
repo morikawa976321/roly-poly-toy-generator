@@ -9,10 +9,21 @@ type Props = {
   centroidZ: number;
   height: number;
   className?: string;
+  /** B3 プロファイルキャッシュ更新でメッシュを再構築する */
+  profileVersion?: number;
 };
 
-function ToyMesh({ gene }: { gene: Gene }) {
-  const geom = useMemo(() => cappedGeometryFromGene(gene, 128), [gene]);
+function ToyMesh({
+  gene,
+  profileVersion = 0,
+}: {
+  gene: Gene;
+  profileVersion?: number;
+}) {
+  const geom = useMemo(
+    () => cappedGeometryFromGene(gene, 128),
+    [gene, profileVersion],
+  );
   return (
     <mesh geometry={geom} castShadow receiveShadow>
       <meshStandardMaterial color="#94a3b8" metalness={0.05} roughness={0.9} />
@@ -44,6 +55,7 @@ export default function ModelViewer({
   centroidZ,
   height,
   className = defaultClassName,
+  profileVersion = 0,
 }: Props) {
   return (
     <div className={className}>
@@ -56,7 +68,7 @@ export default function ModelViewer({
         <directionalLight position={[-100, -100, 50]} intensity={0.3} />
         <Bounds fit clip observe margin={1.2}>
           <group>
-            <ToyMesh gene={gene} />
+            <ToyMesh gene={gene} profileVersion={profileVersion} />
             <CentroidMarker centroidZ={centroidZ} height={height} />
           </group>
         </Bounds>

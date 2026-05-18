@@ -1,4 +1,9 @@
-"""上部延長: smooth_profile の局所曲率（C²）を保った 5 次外挿で延長する。"""
+"""上部延長とメッシュ用 effective プロファイル。
+
+メッシュ / STEP / 3D（``effective_profile``）:
+  1. ``smooth_profile`` + 現行 5 次延長でレガシー (z,r) を生成
+  2. その密サンプル列に B3（``b3_refit_profile``）で再フィット → 1 本のスプライン
+"""
 
 from __future__ import annotations
 
@@ -7,7 +12,7 @@ from typing import TYPE_CHECKING, Tuple
 import numpy as np
 
 from .shape import _eval_quintic, _quintic_coeffs
-from .smoothing import mild_smooth_profile, smooth_profile
+from .smoothing import b3_refit_profile, mild_smooth_profile, smooth_profile
 
 if TYPE_CHECKING:
     from .models import Gene
@@ -141,14 +146,24 @@ def _compute_delta_max(
     return float(best)
 
 
+def _extension_junction_source(gene: Gene) -> Tuple[np.ndarray, np.ndarray]:
+    """延長の接続条件は旧 smooth_profile から取る（5 次外挿はそちら向けに調整済み）。"""
+    return smooth_profile(base_gene(gene))
+
+
 def _build_extended(
     z0: np.ndarray,
     r0: np.ndarray,
     delta: float,
     delta_max: float,
+    junction_z: np.ndarray | None = None,
+    junction_r: np.ndarray | None = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    H, r_junc, dr, d2r = _junction_state(z0, r0)
-    r_base = _base_with_smooth_top(z0, r0)
+    jz = junction_z if junction_z is not None else z0
+    jr = junction_r if junction_r is not None else r0
+    H, r_junc, dr, d2r = _junction_state(jz, jr)
+    r_base = np.array(r0, dtype=float, copy=True)
+    r_base[-1] = r_junc
     L_span = max(delta, delta_max)
     z_seg, r_seg = _extension_segment(H, r_junc, dr, d2r, delta, L_span)
     if len(z_seg) == 0:
@@ -161,23 +176,35 @@ def _build_extended(
     return z_out, r_out
 
 
-def _profile_with_extension(
+def profile_with_extension(
     gene: Gene,
     z0: np.ndarray,
     r0: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """ガウシアン等の基底 (z,r) に上部延長を付与（レガシー経路）。"""
     ext = float(getattr(gene, "top_extension_mm", 0.0) or 0.0)
     if ext <= _Z_EPS:
         return z0, r0
-    d_max = _compute_delta_max(z0, r0)
+    jz, jr = _extension_junction_source(gene)
+    d_max = _compute_delta_max(jz, jr)
     if ext > d_max + 1e-6:
         ext = d_max
-    return _build_extended(z0, r0, ext, d_max)
+    return _build_extended(z0, r0, ext, d_max, junction_z=jz, junction_r=jr)
+
+
+def legacy_mesh_profile(gene: Gene) -> Tuple[np.ndarray, np.ndarray]:
+    """メッシュ用レガシー母線: smooth_profile（基底）+ 現行延長。"""
+    z0, r0 = smooth_profile(base_gene(gene))
+    return profile_with_extension(gene, z0, r0)
 
 
 def effective_profile(gene: Gene) -> Tuple[np.ndarray, np.ndarray]:
-    z0, r0 = smooth_profile(base_gene(gene))
-    return _profile_with_extension(gene, z0, r0)
+    """レガシー (z,r) を密サンプルのまま B3 再フィットした 1 本のプロファイル。"""
+    z_legacy, r_legacy = legacy_mesh_profile(gene)
+    return b3_refit_profile(z_legacy, r_legacy, n_control=int(gene.N))
+
+
+_profile_with_extension = profile_with_extension
 
 
 def feasibility_profile(gene: Gene) -> Tuple[np.ndarray, np.ndarray]:
@@ -187,5 +214,5 @@ def feasibility_profile(gene: Gene) -> Tuple[np.ndarray, np.ndarray]:
 
 
 def max_top_extension_mm(gene: Gene, tol: float = 0.05) -> float:
-    z0, r0 = smooth_profile(base_gene(gene))
-    return _compute_delta_max(z0, r0, tol=tol)
+    jz, jr = _extension_junction_source(gene)
+    return _compute_delta_max(jz, jr, tol=tol)

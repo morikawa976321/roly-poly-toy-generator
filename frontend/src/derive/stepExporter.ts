@@ -2,7 +2,7 @@
  * STEP ファイルエクスポーター
  *
  * opencascade.js (WASM ~65 MB) を lazy-load し、
- * smoothProfile() が返す (z, r) プロファイルから
+ * effectiveProfile(gene) — ガウシアン+延長→B3 再フィット後の (z, r) から
  * OpenCascade の BRep カーネルで回転体ソリッドを構築、
  * STEPControl_Writer で STEP AP214 形式に書き出す。
  *
@@ -214,7 +214,7 @@ function getOC(): Promise<any> {
 /**
  * Gene から STEP ファイルの Blob を生成する。
  *
- * 1. smoothProfile(gene) でプロファイル (z, r) を取得
+ * 1. effectiveProfile(gene) — B3 smoothing spline — で (z, r) を取得
  * 2. r > 0 の区間を BRepBuilderAPI_MakeEdge でエッジ化
  * 3. Z 軸上の閉路（r=0 の端点同士をつなぐ）を加えてワイヤー→フェースを構築
  * 4. BRepPrimAPI_MakeRevol で 360° 回転してソリッド化

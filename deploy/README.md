@@ -12,6 +12,17 @@
 
 バックエンドは不要です（静的ホスティングのみ）。
 
+## メッシュ / STEP の形状パイプライン
+
+メインアプリ・backend の `effective_profile` と同じ順序です（`@core/derive` 経由）。
+
+1. **ガウシアン平滑** … `smoothProfile`（64 制御点 → 密 z 格子 + σ=24）
+2. **上部延長** … 接続条件はガウシアン母線、5 次外挿（`legacyMeshProfile`）
+3. **B3 再フィット** … 上記密 (z,r) を同じ z で `UnivariateSpline`（Pyodide + SciPy）
+4. **カット** … 回転メッシュ生成後に平面クリップ（`clipGeneMesh`）。STEP も同様
+
+初回表示時にブラウザが Pyodide（numpy/scipy）を CDN から読み込みます。
+
 ## ローカル開発
 
 ```bash

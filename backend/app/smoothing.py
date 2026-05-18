@@ -33,6 +33,11 @@ DENSE_FACTOR: int = 24
 FEASIBILITY_PROFILE_N: int = 281
 FEASIBILITY_SMOOTH_SIGMA: float = 8.0
 
+# 手法 5 (B3): 64 制御点 smoothing spline — tools/compare_profile_smoothing と同じ
+B3_SPLINE_S: float = 0.8
+# 密サンプル再フィット用: 64 点向け s を点数比でスケール（≈同程度の平滑化強度）
+B3_REFIT_S_PER_NODE: float = B3_SPLINE_S
+
 
 def _gaussian_filter1d(x: np.ndarray, sigma: float) -> np.ndarray:
     """1D Gaussian smoothing with nearest edge handling (SciPy-free)."""
@@ -134,6 +139,66 @@ def smooth_profile(
     # 端点のハード固定 + 負値のクリップ（数値誤差対策）。
     # v2 gene では r_nodes[0]=0（球キャップの極点）、r_nodes[-1]=rt≥0（上端丸め半径）。
     # v1 gene では r_nodes[0]=bottom_radius>0、r_nodes[-1]=0。どちらもそのまま使う。
+    r_dense[0] = float(r_nodes[0])
+    r_dense[-1] = float(r_nodes[-1])
+    np.maximum(r_dense, 0.0, out=r_dense)
+    return z_dense, r_dense
+
+
+def b3_refit_s(n_samples: int, n_control: int = 64) -> float:
+    """``UnivariateSpline`` 用 s。制御点 N 個向け ``B3_SPLINE_S`` を密サンプル数に比例させる。"""
+    n = max(int(n_samples), 1)
+    nc = max(int(n_control), 1)
+    return float(B3_REFIT_S_PER_NODE) * n / nc
+
+
+def b3_refit_profile(
+    z: np.ndarray,
+    r: np.ndarray,
+    *,
+    s: float | None = None,
+    n_control: int = 64,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """レガシー (z,r) 列上で B3 平滑化スプラインを再フィットし、同じ z 格子で評価。"""
+    from scipy.interpolate import UnivariateSpline
+
+    z = np.asarray(z, dtype=float)
+    r = np.asarray(r, dtype=float)
+    if len(z) != len(r) or len(z) < 4:
+        raise ValueError("b3_refit_profile requires same-length z, r with >= 4 points")
+    s_val = float(b3_refit_s(len(z), n_control)) if s is None else float(s)
+    spl = UnivariateSpline(z, r, s=s_val, k=3)
+    r_out = np.asarray(spl(z), dtype=float)
+    r_out[0] = float(r[0])
+    r_out[-1] = float(r[-1])
+    np.maximum(r_out, 0.0, out=r_out)
+    peak = int(np.argmax(r_out))
+    for i in range(peak + 1, len(r_out)):
+        if r_out[i] > r_out[i - 1]:
+            r_out[i] = r_out[i - 1]
+    return z, r_out
+
+
+def b3_smooth_profile(
+    gene: Gene,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """手法 5 (B3): 制御点 smoothing cubic spline (s=B3_SPLINE_S) → 密 z 格子。
+
+    ``UnivariateSpline(z_nodes, r_nodes, s=B3_SPLINE_S, k=3)`` 相当。
+    詳細ビュー・STEP 出力用。feasibility には ``mild_smooth_profile`` を使う。
+    """
+    from scipy.interpolate import UnivariateSpline
+
+    n = int(gene.N)
+    height = float(gene.height)
+    w = _effective_z_warp(getattr(gene, "z_warp", None))
+
+    z_nodes = gene_z_nodes(gene)
+    r_nodes = np.asarray(gene.radii, dtype=float)
+    z_dense = _dense_z(height, n, DENSE_FACTOR, z_warp=w)
+
+    spl = UnivariateSpline(z_nodes, r_nodes, s=float(B3_SPLINE_S), k=3)
+    r_dense = np.asarray(spl(z_dense), dtype=float)
     r_dense[0] = float(r_nodes[0])
     r_dense[-1] = float(r_nodes[-1])
     np.maximum(r_dense, 0.0, out=r_dense)

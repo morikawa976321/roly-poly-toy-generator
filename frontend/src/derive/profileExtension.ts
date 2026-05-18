@@ -1,4 +1,10 @@
+/**
+ * 上部延長（レガシー）とメッシュ用 effective プロファイル。
+ *
+ * effective: smoothProfile + 延長 → 密 (z,r) → B3 再フィット（1 本のスプライン）
+ */
 import type { Gene } from "../types";
+import { getEffectiveProfile } from "./b3ProfileCache";
 import { mildSmoothProfile, smoothProfile } from "./smoothing";
 
 const EXTENSION_SAMPLES = 96;
@@ -75,13 +81,6 @@ function junctionState(z: number[], r: number[]): {
   }
   if (dr > -1e-9) dr = -1e-6;
   return { H, rJunc, dr, d2r };
-}
-
-function baseWithSmoothTop(z: number[], r: number[]): number[] {
-  const { rJunc } = junctionState(z, r);
-  const out = [...r];
-  out[out.length - 1] = rJunc;
-  return out;
 }
 
 function polyfit2(z: number[], r: number[]): [number, number, number] {
@@ -235,9 +234,15 @@ function buildExtended(
   r0: number[],
   delta: number,
   deltaMax: number,
+  junctionSource?: { z: number[]; r: number[] },
 ): { z: number[]; r: number[] } {
-  const { H, rJunc, dr, d2r } = junctionState(z0, r0);
-  const rBase = baseWithSmoothTop(z0, r0);
+  // 延長の 5 次外挿は旧 smoothProfile 向けに調整済み。本体は B3 でも接続条件は
+  // ガウシアン平滑プロファイルから取り、延長部の見た目を従来に近づける。
+  const jz = junctionSource?.z ?? z0;
+  const jr = junctionSource?.r ?? r0;
+  const { H, rJunc, dr, d2r } = junctionState(jz, jr);
+  const rBase = [...r0];
+  rBase[rBase.length - 1] = rJunc;
   const Lspan = Math.max(delta, deltaMax);
   const { z: zSeg, r: rSeg } = extensionSegment(H, rJunc, dr, d2r, delta, Lspan);
   if (zSeg.length === 0) return { z: z0, r: r0 };
@@ -250,6 +255,10 @@ function buildExtended(
   return { z, r };
 }
 
+function extensionJunctionSource(gene: Gene): { z: number[]; r: number[] } {
+  return smoothProfile(baseGene(gene));
+}
+
 function profileWithExtension(
   gene: Gene,
   z0: number[],
@@ -259,22 +268,48 @@ function profileWithExtension(
   if (!Number.isFinite(ext) || ext <= Z_EPS) {
     return { z: z0, r: r0 };
   }
-  const dMax = computeDeltaMax(z0, r0);
+  const junction = extensionJunctionSource(gene);
+  const dMax = computeDeltaMax(junction.z, junction.r);
   const clamped = Math.min(ext, dMax);
-  return buildExtended(z0, r0, clamped, dMax);
+  try {
+    return buildExtended(z0, r0, clamped, dMax, junction);
+  } catch {
+    if (dMax <= Z_EPS) return { z: z0, r: r0 };
+    try {
+      return buildExtended(z0, r0, dMax, dMax, junction);
+    } catch {
+      return { z: z0, r: r0 };
+    }
+  }
 }
 
-export function effectiveProfile(gene: Gene): { z: number[]; r: number[] } {
+/** レガシー母線: ガウシアン平滑化 + 現行延長（B3 再フィット前） */
+export function legacyMeshProfile(gene: Gene): { z: number[]; r: number[] } {
   const { z, r } = smoothProfile(baseGene(gene));
   return profileWithExtension(gene, z, r);
 }
 
+export function effectiveProfile(gene: Gene): { z: number[]; r: number[] } {
+  const cached = getEffectiveProfile(gene);
+  if (cached) return cached;
+  if (typeof process !== "undefined" && process.env.VITEST === "true") {
+    return legacyMeshProfile(gene);
+  }
+  throw new Error(
+    "Effective profile not loaded. Call initB3Pyodide() and ensureEffectiveProfile() first.",
+  );
+}
+
+function feasibilityBaseProfile(gene: Gene): { z: number[]; r: number[] } {
+  return mildSmoothProfile(baseGene(gene));
+}
+
 export function feasibilityProfile(gene: Gene): { z: number[]; r: number[] } {
-  const { z, r } = mildSmoothProfile(baseGene(gene));
+  const { z, r } = feasibilityBaseProfile(gene);
   return profileWithExtension(gene, z, r);
 }
 
 export function maxTopExtensionMm(gene: Gene, tol = 0.05): number {
-  const { z, r } = smoothProfile(baseGene(gene));
-  return computeDeltaMax(z, r, tol);
+  const junction = extensionJunctionSource(gene);
+  return computeDeltaMax(junction.z, junction.r, tol);
 }

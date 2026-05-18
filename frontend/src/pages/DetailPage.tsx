@@ -7,6 +7,12 @@ import ModelViewer from "../components/ModelViewer";
 import { geneWithModifications, computeMetrics } from "../derive/metrics";
 import { maxTopExtensionMm } from "../derive/profileExtension";
 import { thumbnailDataUrl } from "../derive/thumbnailSvg";
+import { ensureEffectiveProfile, initB3Pyodide } from "../derive/ensureB3Profile";
+import {
+  getEffectiveProfile,
+  getB3ProfileCacheVersion,
+  subscribeB3ProfileCache,
+} from "../derive/b3ProfileCache";
 import { exportGeneToStepBlob } from "../derive/stepExporter";
 
 const PREVIEW_DEBOUNCE_MS = 400;
@@ -33,22 +39,45 @@ export default function DetailPage() {
   const [stepLoading, setStepLoading] = useState(false);
   const stepBlobUrlRef = useRef<string | null>(null);
   const initExtensionForDesignRef = useRef<string | null>(null);
+  const [b3Ready, setB3Ready] = useState(false);
+  const [b3LoadError, setB3LoadError] = useState<string | null>(null);
+  const [profileVersion, setProfileVersion] = useState(0);
+
+  useEffect(() => subscribeB3ProfileCache(() => setProfileVersion(getB3ProfileCacheVersion())), []);
 
   useEffect(() => {
     if (!data) return;
-    const useMaxDefault = initExtensionForDesignRef.current !== data.design_id;
-    initExtensionForDesignRef.current = data.design_id;
-    const params: PreviewParams = {
-      extensionMm: useMaxDefault
-        ? maxTopExtensionMm(data.gene)
-        : Number(data.gene.top_extension_mm ?? 0),
-      cutHeightMm: Number(data.gene.top_cut_height_mm ?? 0),
-      cutAngleDeg: Number(data.gene.top_cut_angle_deg ?? 0),
+    let cancelled = false;
+    setB3Ready(false);
+    setB3LoadError(null);
+    void (async () => {
+      try {
+        await initB3Pyodide();
+        await ensureEffectiveProfile(data.gene);
+        if (cancelled) return;
+        setB3Ready(true);
+        const useMaxDefault = initExtensionForDesignRef.current !== data.design_id;
+        initExtensionForDesignRef.current = data.design_id;
+        const params: PreviewParams = {
+          extensionMm: useMaxDefault
+            ? maxTopExtensionMm(data.gene)
+            : Number(data.gene.top_extension_mm ?? 0),
+          cutHeightMm: Number(data.gene.top_cut_height_mm ?? 0),
+          cutAngleDeg: Number(data.gene.top_cut_angle_deg ?? 0),
+        };
+        setDraftExtensionMm(params.extensionMm);
+        setDraftCutHeightMm(params.cutHeightMm);
+        setDraftCutAngleDeg(params.cutAngleDeg);
+        setDebouncedPreview(params);
+      } catch (e) {
+        if (!cancelled) {
+          setB3LoadError(e instanceof Error ? e.message : String(e));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-    setDraftExtensionMm(params.extensionMm);
-    setDraftCutHeightMm(params.cutHeightMm);
-    setDraftCutAngleDeg(params.cutAngleDeg);
-    setDebouncedPreview(params);
   }, [data]);
 
   useEffect(() => {
@@ -73,30 +102,45 @@ export default function DetailPage() {
     );
   }, [data, debouncedPreview]);
 
+  useEffect(() => {
+    if (!b3Ready || !previewGene) return;
+    void ensureEffectiveProfile(previewGene).catch((e) => {
+      setB3LoadError(e instanceof Error ? e.message : String(e));
+    });
+  }, [b3Ready, previewGene]);
+
   const maxExtensionMm = useMemo(() => {
-    if (!data) return 0;
+    if (!data || !b3Ready) return 0;
     return maxTopExtensionMm(data.gene);
-  }, [data]);
+  }, [data, b3Ready, profileVersion]);
 
   const profileTopMm = useMemo(() => {
-    if (!previewGene) return 0;
-    const m = computeMetrics({
-      ...previewGene,
-      top_cut_height_mm: 0,
-      top_cut_angle_deg: 0,
-    });
-    return m.height;
-  }, [previewGene]);
+    if (!previewGene || !b3Ready || !getEffectiveProfile(previewGene)) return 0;
+    try {
+      const m = computeMetrics({
+        ...previewGene,
+        top_cut_height_mm: 0,
+        top_cut_angle_deg: 0,
+      });
+      return m.height;
+    } catch {
+      return 0;
+    }
+  }, [previewGene, b3Ready, profileVersion]);
 
   const liveMetrics = useMemo(() => {
-    if (!previewGene) return null;
-    return computeMetrics(previewGene);
-  }, [previewGene]);
+    if (!previewGene || !b3Ready || !getEffectiveProfile(previewGene)) return null;
+    try {
+      return computeMetrics(previewGene);
+    } catch {
+      return null;
+    }
+  }, [previewGene, b3Ready, profileVersion]);
 
   const detailThumbUrl = useMemo(() => {
-    if (!previewGene || !liveMetrics) return "";
+    if (!previewGene || !liveMetrics || !b3Ready) return "";
     return thumbnailDataUrl(previewGene, liveMetrics);
-  }, [previewGene, liveMetrics]);
+  }, [previewGene, liveMetrics, b3Ready, profileVersion]);
 
   useEffect(() => {
     if (stepBlobUrlRef.current) {
@@ -106,9 +150,10 @@ export default function DetailPage() {
   }, [data]);
 
   const handleStepDownload = useCallback(async () => {
-    if (!data || !previewGene) return;
+    if (!data || !previewGene || !b3Ready) return;
     setStepLoading(true);
     try {
+      await ensureEffectiveProfile(previewGene);
       const blob = await exportGeneToStepBlob(previewGene);
       const url = URL.createObjectURL(blob);
       if (stepBlobUrlRef.current) URL.revokeObjectURL(stepBlobUrlRef.current);
@@ -126,7 +171,7 @@ export default function DetailPage() {
     } finally {
       setStepLoading(false);
     }
-  }, [data, previewGene]);
+  }, [data, previewGene, b3Ready]);
 
   const handleSave = useCallback(async () => {
     if (!data) return;
@@ -179,14 +224,16 @@ export default function DetailPage() {
         </Link>
       </div>
 
-      {error && (
+      {(error || b3LoadError) && (
         <div className="mb-4 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
+          {error ?? b3LoadError}
         </div>
       )}
 
-      {!data || !previewGene || !liveMetrics ? (
-        <div className="text-sm text-slate-500">Loading...</div>
+      {!data || !previewGene || !liveMetrics || !b3Ready ? (
+        <div className="text-sm text-slate-500">
+          {!data ? "Loading..." : "B3 プロファイルを準備しています…"}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2">
@@ -204,6 +251,7 @@ export default function DetailPage() {
               gene={previewGene}
               centroidZ={liveMetrics.centroid_z}
               height={liveMetrics.height}
+              profileVersion={profileVersion}
             />
           </div>
           <div className="space-y-4">

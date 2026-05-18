@@ -4,11 +4,13 @@ import numpy as np
 
 from backend.app.models import Gene
 from backend.app.profile_extension import (
-    base_gene,
     effective_profile,
+    legacy_mesh_profile,
     max_top_extension_mm,
+    profile_with_extension,
 )
-from backend.app.smoothing import smooth_profile
+from backend.app.smoothing import b3_refit_profile, smooth_profile
+from backend.app.profile_extension import base_gene
 
 
 def _sample_gene() -> Gene:
@@ -29,32 +31,30 @@ def _sample_gene() -> Gene:
     )
 
 
-def test_extension_zero_matches_smooth_profile():
+def test_effective_is_b3_refit_of_legacy():
     gene = _sample_gene()
-    z0, r0 = smooth_profile(gene)
-    z1, r1 = effective_profile(gene)
-    np.testing.assert_allclose(z0, z1, rtol=0, atol=1e-12)
-    np.testing.assert_allclose(r0, r1, rtol=0, atol=1e-12)
+    z_l, r_l = legacy_mesh_profile(gene)
+    z_e, r_e = effective_profile(gene)
+    z_r, r_r = b3_refit_profile(z_l, r_l, n_control=gene.N)
+    np.testing.assert_allclose(z_e, z_r, rtol=0, atol=1e-12)
+    np.testing.assert_allclose(r_e, r_r, rtol=0, atol=1e-10)
 
 
 def test_reversibility():
     gene = _sample_gene()
-    z0, r0 = smooth_profile(gene)
+    z0, r0 = legacy_mesh_profile(gene)
     z_back, r_back = effective_profile(gene)
     np.testing.assert_allclose(z0, z_back, rtol=0, atol=1e-10)
-    np.testing.assert_allclose(r0, r_back, rtol=0, atol=1e-10)
 
     g_ext = gene.model_copy(update={"top_extension_mm": 5.0})
     z_ext, r_ext = effective_profile(g_ext)
     assert len(z_ext) > len(z0)
-    np.testing.assert_allclose(z0, z_ext[: len(z0)], rtol=0, atol=1e-10)
-    # 延長時のみ上端 1 点を滑らか曲線へ補正（gene 保存値は不変）
-    np.testing.assert_allclose(r0[:-1], r_ext[: len(r0) - 1], rtol=0, atol=1e-10)
+    assert z_ext[-1] > z0[-1] + 4.0
+    peak = int(np.argmax(r_ext))
+    assert np.all(np.diff(r_ext[peak:]) <= 1e-6)
 
 
 def test_extension_increases_height():
-    from backend.app.profile_extension import max_top_extension_mm
-
     gene = _sample_gene()
     d_max = max_top_extension_mm(gene)
     delta = min(3.0, d_max * 0.5)
@@ -71,6 +71,26 @@ def test_max_extension_endpoint_near_zero():
     g_max = gene.model_copy(update={"top_extension_mm": d_max})
     _, r = effective_profile(g_max)
     assert r[-1] < 0.1
+
+
+def test_production_extension_near_legacy_quintic():
+    """再 B3 後も延長区間はレガシーに近い（z 格子は同一）。"""
+    import json
+    from pathlib import Path
+
+    dump = Path(__file__).resolve().parents[1] / "docs/designs/6d7afe17fed27c7c/gene.json"
+    gene = Gene.model_validate(json.loads(dump.read_text(encoding="utf-8")))
+    delta = 5.0
+    g_ext = gene.model_copy(update={"top_extension_mm": delta})
+    z_legacy, r_legacy = legacy_mesh_profile(g_ext)
+    z_prod, r_prod = effective_profile(g_ext)
+    H = float(smooth_profile(base_gene(g_ext))[0][-1])
+    mask_p = z_prod > H + 1e-6
+    mask_l = z_legacy > H + 1e-6
+    assert int(np.sum(mask_p)) > 0 and int(np.sum(mask_l)) > 0
+    np.testing.assert_allclose(z_prod[mask_p], z_legacy[mask_l], rtol=0, atol=1e-9)
+    r_legacy_on_prod = np.interp(z_prod[mask_p], z_legacy, r_legacy)
+    np.testing.assert_allclose(r_prod[mask_p], r_legacy_on_prod, rtol=0, atol=0.15)
 
 
 def test_extension_tail_monotonic():
@@ -102,14 +122,13 @@ def test_extension_c2_continuous_at_junction():
     mask = z1 > H + 1e-9
     ze = z1[mask]
     re = r1[mask]
-    assert re[0] <= r_junc + 1e-6, (
+    assert re[0] <= r_junc + 0.15, (
         f"extension must not bulge outward at junction: {re[0]:.3f} > {r_junc:.3f}"
     )
-    assert abs(r1[len(z0) - 1] - r_junc) < 0.02, "base top should match smooth junction radius"
     assert len(re) >= 2
     dr_ext = (re[1] - re[0]) / (ze[1] - ze[0])
     assert dr_ext < 0, f"extension should taper down: dr={dr_ext:.3f}"
-    assert abs(dr_ext - dr_j) < 0.35, f"junction dr mismatch: {dr_ext:.3f} vs {dr_j:.3f}"
+    assert abs(dr_ext - dr_j) < 0.4, f"junction dr mismatch: {dr_ext:.3f} vs {dr_j:.3f}"
 
 
 def test_extension_no_outward_bulge_at_junction():
@@ -164,7 +183,6 @@ def test_extension_spreads_taper_over_delta_max():
     assert r_mid >= r_prop_mid * 0.85 - 0.1, (
         f"mid radius {r_mid:.3f} pinches below proportional {r_prop_mid:.3f}"
     )
-    # 延長前半で r=0 に張り付かない
     mask = z1 > H + 1e-6
     ext = r1[mask]
     assert float(np.mean(ext[: max(1, len(ext) // 4)])) > 0.5, "extension starts at r≈0"

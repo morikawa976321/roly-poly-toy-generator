@@ -16,6 +16,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ["opencascade.js"],
+    exclude: ["opencascade.js", "pyodide"],
   },
 });
