@@ -27,34 +27,6 @@ def profile_points(
     return effective_profile(gene)
 
 
-def compute_metrics_from_profile(
-    z: np.ndarray,
-    r: np.ndarray,
-) -> Metrics:
-    """Compute volume / height / max_width / centroid_z from a dense profile."""
-
-    dz = np.diff(z)
-    a = r[:-1]
-    b = r[1:]
-
-    k = a * a + a * b + b * b
-    vol_i = (np.pi / 3.0) * dz * k
-
-    eps = 1e-12
-    z_c_local = dz * (a * a + 2.0 * a * b + 3.0 * b * b) / (4.0 * np.maximum(k, eps))
-    z_c_global = z[:-1] + z_c_local
-
-    volume = float(np.sum(vol_i))
-    centroid_z = float(np.sum(vol_i * z_c_global) / volume) if volume > 0.0 else 0.0
-
-    return Metrics(
-        volume=volume,
-        height=float(z[-1]),
-        max_width=float(2.0 * np.max(r)),
-        centroid_z=centroid_z,
-    )
-
-
 def compute_metrics(
     gene: Gene,
     feasibility: Optional[Feasibility] = None,

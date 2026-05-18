@@ -33,8 +33,3 @@ export async function ensureEffectiveProfile(gene: Gene): Promise<void> {
   }
   await p;
 }
-
-/** @deprecated ensureEffectiveProfile を使用 */
-export async function ensureB3BaseProfile(gene: Gene): Promise<void> {
-  return ensureEffectiveProfile(gene);
-}

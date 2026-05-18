@@ -9,7 +9,7 @@ import math
 
 import numpy as np
 
-from backend.app.mesh_plane_cut import clip_mesh_below_plane, cut_would_change
+from backend.app.mesh_plane_cut import clip_mesh_below_plane
 from backend.app.mesh_revolve import revolve_mesh
 from backend.app.models import Gene
 from backend.app.profile_extension import effective_profile

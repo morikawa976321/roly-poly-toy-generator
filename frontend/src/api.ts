@@ -36,7 +36,7 @@ export function getDesign(
   );
 }
 
-export type PatchDesignPayload = {
+type PatchDesignPayload = {
   top_extension_mm: number;
   top_cut_height_mm: number;
   top_cut_angle_deg: number;

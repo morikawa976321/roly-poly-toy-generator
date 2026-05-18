@@ -333,15 +333,6 @@ roly-poly-toy-generator/
 │   ├── dev.mjs                     # npm run dev のオーケストレータ
 │   ├── stop.mjs                    # 孤児プロセス回収
 │   └── package-windows.ps1         # Windows zip 配布ビルド
-├── tools/
-│   ├── compare_profile_smoothing.py  # 平滑化バリアント比較 PNG（current / B3 / B5 / prod）
-│   ├── export_step_variants.py       # 複数プロファイル手法の STEP 一括出力（Python オーケストレータ）
-│   ├── export_step_occt.mjs          # (z, r) JSON → STEP（Node + opencascade.js）
-│   ├── occt-loader.mjs               # opencascade.js WASM の動的 import ヘルパ
-│   ├── occt-register.mjs             # Vite / Node 向け WASM 登録
-│   ├── debug_cut_zcog.py             # カットが z_cog_max に与える影響のデバッグ
-│   ├── oc-apis.txt                   # opencascade.js API リファレンス（ローカル用）
-│   └── output/                       # 検証用 PNG / STEP / profiles JSON（任意・git 管理外推奨）
 ├── data/
 │   └── app.db                      # ローカル SQLite DB（git 管理外）
 ├── build/                          # PyInstaller 出力・配布 zip（git 管理外）

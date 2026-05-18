@@ -6,7 +6,7 @@
  */
 
 /** スプライン近似に渡す最大点数（多すぎると補間が不安定） */
-export const STEP_PROFILE_MAX_POINTS = 96;
+const STEP_PROFILE_MAX_POINTS = 96;
 
 /** z 等間隔に間引き（端点は必ず含める） */
 export function subsampleProfileUniformZ(

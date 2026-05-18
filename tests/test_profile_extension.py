@@ -13,7 +13,6 @@ from backend.app.profile_extension import (
     effective_profile,
     legacy_mesh_profile,
     max_top_extension_mm,
-    profile_with_extension,
 )
 from backend.app.smoothing import b3_refit_profile, smooth_profile
 from backend.app.profile_extension import base_gene

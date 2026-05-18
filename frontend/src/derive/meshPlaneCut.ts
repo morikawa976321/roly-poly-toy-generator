@@ -35,7 +35,7 @@ export function geneTopCutParams(gene: Gene): { zCut: number; tanA: number } {
 }
 
 /** 断面図 (+r / −r) 用: x = ±r で z <= z_cut + x·tan(θ) */
-export function signedProfileCutDist(
+function signedProfileCutDist(
   z: number,
   r: number,
   zCut: number,
@@ -231,12 +231,12 @@ function triangulateFan(poly: Vec3[]): Array<[Vec3, Vec3, Vec3]> {
   return tris;
 }
 
-export function quantKey(v: Vec3): string {
+function quantKey(v: Vec3): string {
   return `${Math.round(v.x * 1e4)}:${Math.round(v.y * 1e4)}:${Math.round(v.z * 1e4)}`;
 }
 
 /** 切断平面 n=(-tanA,0,1) 上へ射影 */
-export function snapToCutPlane(p: Vec3, zCut: number, tanA: number): Vec3 {
+function snapToCutPlane(p: Vec3, zCut: number, tanA: number): Vec3 {
   const d = signedCutDist(p, zCut, tanA);
   if (Math.abs(d) <= 1e-12) return p;
   const denom = 1 + tanA * tanA;

@@ -174,32 +174,6 @@ def b3_refit_profile(
     return z, r_out
 
 
-def b3_smooth_profile(
-    gene: Gene,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """手法 5 (B3): 制御点 smoothing cubic spline (s=B3_SPLINE_S) → 密 z 格子。
-
-    ``UnivariateSpline(z_nodes, r_nodes, s=B3_SPLINE_S, k=3)`` 相当。
-    詳細ビュー・STEP 出力用。feasibility には ``mild_smooth_profile`` を使う。
-    """
-    from scipy.interpolate import UnivariateSpline
-
-    n = int(gene.N)
-    height = float(gene.height)
-    w = _effective_z_warp(getattr(gene, "z_warp", None))
-
-    z_nodes = gene_z_nodes(gene)
-    r_nodes = np.asarray(gene.radii, dtype=float)
-    z_dense = _dense_z(height, n, DENSE_FACTOR, z_warp=w)
-
-    spl = UnivariateSpline(z_nodes, r_nodes, s=float(B3_SPLINE_S), k=3)
-    r_dense = np.asarray(spl(z_dense), dtype=float)
-    r_dense[0] = float(r_nodes[0])
-    r_dense[-1] = float(r_nodes[-1])
-    np.maximum(r_dense, 0.0, out=r_dense)
-    return z_dense, r_dense
-
-
 def mild_smooth_profile(
     gene: Gene,
     *,

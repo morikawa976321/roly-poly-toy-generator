@@ -8,17 +8,17 @@ import type { Gene } from "../types";
 
 export const DENSE_FACTOR = 24;
 /** 手法 5 (B3): 64 制御点 smoothing spline — compare_profile_smoothing と同じ */
-export const B3_SPLINE_S = 0.8;
+const B3_SPLINE_S = 0.8;
 /** 密サンプル再フィット用（backend ``b3_refit_s`` と同じスケール） */
-export const B3_REFIT_S_PER_NODE = B3_SPLINE_S;
+const B3_REFIT_S_PER_NODE = B3_SPLINE_S;
 
 export function b3RefitS(nSamples: number, nControl: number): number {
   const n = Math.max(Math.trunc(nSamples), 1);
   const nc = Math.max(Math.trunc(nControl), 1);
   return (B3_REFIT_S_PER_NODE * n) / nc;
 }
-export const FEASIBILITY_PROFILE_N = 281;
-export const FEASIBILITY_SMOOTH_SIGMA = 8;
+const FEASIBILITY_PROFILE_N = 281;
+const FEASIBILITY_SMOOTH_SIGMA = 8;
 
 function effectiveZWarp(zWarp: unknown): number {
   if (zWarp === null || zWarp === undefined) return 1.0;

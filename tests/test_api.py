@@ -7,7 +7,6 @@ API 側のバリデーション/分岐/ループガードだけを検証する�
 
 from __future__ import annotations
 
-from typing import Optional
 
 import pytest
 from fastapi.testclient import TestClient

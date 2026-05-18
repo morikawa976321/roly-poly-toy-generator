@@ -12,7 +12,7 @@ import pytest
 
 from backend.app import storage
 from backend.app.metrics import compute_metrics
-from backend.app.models import Gene, Metrics
+from backend.app.models import Gene
 
 
 def _make_gene(**overrides) -> Gene:

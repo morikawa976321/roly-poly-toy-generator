@@ -20,7 +20,7 @@ import { feasibilityProfile } from "./profileExtension";
 
 const CUT_EPS = 1e-6;
 
-export function hasActiveTopCut(gene: Gene): boolean {
+function hasActiveTopCut(gene: Gene): boolean {
   const { zCut, tanA } = geneTopCutParams(gene);
   return zCut > CUT_EPS || Math.abs(tanA) > CUT_EPS;
 }
