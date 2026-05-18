@@ -12,6 +12,7 @@ from typing import Iterator, Optional, Tuple
 
 import numpy as np
 
+from .config import REVOLVE_SEGMENTS
 from .models import Gene
 from .physics import Feasibility, feasibility_from_profile
 from .profile_cut import (
@@ -44,7 +45,7 @@ def _mesh_silhouette_meridian(
     from .mesh_plane_cut import clip_mesh_below_plane, cut_would_change
     from .mesh_revolve import revolve_mesh
 
-    verts, tris = revolve_mesh(z, r, radial_segments=96)
+    verts, tris = revolve_mesh(z, r, radial_segments=REVOLVE_SEGMENTS)
     tan_a = math.tan(math.radians(angle_deg)) if abs(angle_deg) > _CUT_EPS else 0.0
     if not cut_would_change(verts, z_cut, tan_a):
         return z, r

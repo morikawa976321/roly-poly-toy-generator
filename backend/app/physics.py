@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from .config import EPS_MM, TILT_MAX_DEG
+from .dsp import gaussian_filter1d as _gaussian_filter1d
 from .models import Gene
 
 
@@ -26,22 +27,6 @@ HEAD_SKIP_FRACTION: float = 0.03
 # 転がるときに接触点が連続に動かない（= 起き上がりこぼしにならない）。
 # 円錐や円柱を rejects するための閾値。典型サイズの 3〜5 倍を目安にする。
 RHO_M_CAP_MM: float = 200.0
-
-
-def _gaussian_filter1d(x: np.ndarray, sigma: float) -> np.ndarray:
-    """1D Gaussian smoothing with nearest edge handling (SciPy-free)."""
-    x = np.asarray(x, dtype=float)
-    sigma = float(sigma)
-    if not np.isfinite(sigma) or sigma <= 0.0:
-        return x
-    radius = int(max(3, round(4.0 * sigma)))
-    xs = np.arange(-radius, radius + 1, dtype=float)
-    k = np.exp(-0.5 * (xs / sigma) ** 2)
-    k /= np.sum(k)
-    pad_left = np.full(radius, x[0], dtype=float)
-    pad_right = np.full(radius, x[-1], dtype=float)
-    padded = np.concatenate([pad_left, x, pad_right])
-    return np.convolve(padded, k, mode="valid")
 
 
 @dataclass(frozen=True)

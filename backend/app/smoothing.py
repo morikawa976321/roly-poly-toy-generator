@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any, Tuple
 
 import numpy as np
 
+from .dsp import gaussian_filter1d as _gaussian_filter1d
+
 if TYPE_CHECKING:
     from .models import Gene
 else:
@@ -32,22 +34,6 @@ FEASIBILITY_SMOOTH_SIGMA: float = 8.0
 B3_SPLINE_S: float = 0.8
 # 密サンプル再フィット用: 64 点向け s を点数比でスケール（≈同程度の平滑化強度）
 B3_REFIT_S_PER_NODE: float = B3_SPLINE_S
-
-
-def _gaussian_filter1d(x: np.ndarray, sigma: float) -> np.ndarray:
-    """1D Gaussian smoothing with nearest edge handling (SciPy-free)."""
-    x = np.asarray(x, dtype=float)
-    sigma = float(sigma)
-    if not np.isfinite(sigma) or sigma <= 0.0:
-        return x
-    radius = int(max(3, round(4.0 * sigma)))
-    xs = np.arange(-radius, radius + 1, dtype=float)
-    k = np.exp(-0.5 * (xs / sigma) ** 2)
-    k /= np.sum(k)
-    pad_left = np.full(radius, x[0], dtype=float)
-    pad_right = np.full(radius, x[-1], dtype=float)
-    padded = np.concatenate([pad_left, x, pad_right])
-    return np.convolve(padded, k, mode="valid")
 
 
 def _effective_z_warp(z_warp: Any) -> float:

@@ -5,41 +5,19 @@
 カットフィールドが design_id に含まれないことを検証する。
 """
 
-import math
 
 import numpy as np
 
 from backend.app.mesh_plane_cut import clip_mesh_below_plane
 from backend.app.mesh_revolve import revolve_mesh
-from backend.app.models import Gene
 from backend.app.profile_extension import effective_profile
 from backend.app.smoothing import smooth_profile
 
-
-def _sample_gene(**kw) -> Gene:
-    n = 36
-    radii = [0.0]
-    for i in range(1, n - 1):
-        t = i / (n - 1)
-        radii.append(20.0 * math.sin(math.pi * t))
-    radii.append(2.0)
-    data = dict(
-        version=2,
-        N=n,
-        height=50.0,
-        bottom_radius=0.0,
-        radii=radii,
-        z_warp=2.0,
-        top_extension_mm=0.0,
-        top_cut_height_mm=0.0,
-        top_cut_angle_deg=0.0,
-    )
-    data.update(kw)
-    return Gene(**data)
+from tests.factories import sample_gene_profile
 
 
 def test_horizontal_mesh_cut_reduces_height():
-    gene = _sample_gene(top_cut_height_mm=40.0)
+    gene = sample_gene_profile(top_cut_height_mm=40.0)
     z, r = effective_profile(gene)
     verts, tris = revolve_mesh(z, r)
     cut_verts, _ = clip_mesh_below_plane(verts, tris, 40.0, 0.0)
@@ -48,7 +26,7 @@ def test_horizontal_mesh_cut_reduces_height():
 
 def test_cut_mesh_cap_is_watertight():
     """切断面キャップ後も同一位置の各エッジが2面で共有される。"""
-    gene = _sample_gene(top_cut_height_mm=40.0, top_cut_angle_deg=12.0)
+    gene = sample_gene_profile(top_cut_height_mm=40.0, top_cut_angle_deg=12.0)
     z, r = effective_profile(gene)
     verts, tris = revolve_mesh(z, r, radial_segments=32)
     cut_verts, cut_tris = clip_mesh_below_plane(verts, tris, 40.0, 12.0)
@@ -75,7 +53,7 @@ def test_cut_mesh_cap_is_watertight():
 
 
 def test_angled_mesh_cut_breaks_symmetry():
-    z0, r0 = smooth_profile(_sample_gene())
+    z0, r0 = smooth_profile(sample_gene_profile())
     verts, tris = revolve_mesh(z0, r0)
     z_cut = float(z0[-1]) - 5.0
     cut_verts, _ = clip_mesh_below_plane(verts, tris, z_cut, 15.0)
@@ -90,7 +68,7 @@ def test_angled_mesh_cut_breaks_symmetry():
 def test_cut_fields_excluded_from_design_id():
     from backend.app.identify import design_id_for
 
-    base = _sample_gene()
+    base = sample_gene_profile()
     cut = base.model_copy(
         update={"top_cut_height_mm": 30.0, "top_cut_angle_deg": 10.0}
     )

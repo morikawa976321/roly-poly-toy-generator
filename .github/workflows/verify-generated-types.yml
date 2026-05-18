@@ -28,11 +28,21 @@ jobs:
             "fastapi>=0.115" \
             "numpy>=1.26" \
             "pydantic>=2.7" \
+            "scipy>=1.11" \
             "python-dotenv>=1.0"
 
       - name: Install frontend deps
         working-directory: frontend
         run: npm ci
+
+      - name: Install deploy deps
+        working-directory: deploy
+        run: npm ci
+
+      - name: Verify deploy derive sync
+        run: |
+          npm --prefix deploy run sync-core
+          git diff --exit-code deploy/src/derive
 
       - name: Build frontend (SPA routes in OpenAPI need dist/index.html)
         working-directory: frontend

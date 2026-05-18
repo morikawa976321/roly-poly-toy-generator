@@ -11,11 +11,13 @@ from typing import Tuple
 
 import numpy as np
 
+from .config import REVOLVE_SEGMENTS
+
 
 def revolve_mesh(
     z_line: np.ndarray,
     r_line: np.ndarray,
-    radial_segments: int = 96,
+    radial_segments: int = REVOLVE_SEGMENTS,
     eps: float = 1e-6,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """頂点 (N,3) と三角インデックス (M,3) を返す。"""

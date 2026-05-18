@@ -4,7 +4,6 @@
 働き: legacy→B3 再フィット、延長の単調性/C2、最大延長端点、本番延長形状の回帰を確認する。
 """
 
-import math
 
 import numpy as np
 
@@ -17,27 +16,11 @@ from backend.app.profile_extension import (
 from backend.app.smoothing import b3_refit_profile, smooth_profile
 from backend.app.profile_extension import base_gene
 
-
-def _sample_gene() -> Gene:
-    n = 36
-    radii = [0.0]
-    for i in range(1, n - 1):
-        t = i / (n - 1)
-        radii.append(20.0 * math.sin(math.pi * t))
-    radii.append(2.0)
-    return Gene(
-        version=2,
-        N=n,
-        height=50.0,
-        bottom_radius=0.0,
-        radii=radii,
-        z_warp=2.0,
-        top_extension_mm=0.0,
-    )
+from tests.factories import sample_gene_profile
 
 
 def test_effective_is_b3_refit_of_legacy():
-    gene = _sample_gene()
+    gene = sample_gene_profile()
     z_l, r_l = legacy_mesh_profile(gene)
     z_e, r_e = effective_profile(gene)
     z_r, r_r = b3_refit_profile(z_l, r_l, n_control=gene.N)
@@ -46,7 +29,7 @@ def test_effective_is_b3_refit_of_legacy():
 
 
 def test_reversibility():
-    gene = _sample_gene()
+    gene = sample_gene_profile()
     z0, r0 = legacy_mesh_profile(gene)
     z_back, r_back = effective_profile(gene)
     np.testing.assert_allclose(z0, z_back, rtol=0, atol=1e-10)
@@ -60,7 +43,7 @@ def test_reversibility():
 
 
 def test_extension_increases_height():
-    gene = _sample_gene()
+    gene = sample_gene_profile()
     d_max = max_top_extension_mm(gene)
     delta = min(3.0, d_max * 0.5)
     g_ext = gene.model_copy(update={"top_extension_mm": delta})
@@ -70,7 +53,7 @@ def test_extension_increases_height():
 
 
 def test_max_extension_endpoint_near_zero():
-    gene = _sample_gene()
+    gene = sample_gene_profile()
     d_max = max_top_extension_mm(gene)
     assert d_max > 0.0
     g_max = gene.model_copy(update={"top_extension_mm": d_max})
@@ -99,7 +82,7 @@ def test_production_extension_near_legacy_quintic():
 
 
 def test_extension_tail_monotonic():
-    gene = _sample_gene()
+    gene = sample_gene_profile()
     delta = 4.0
     g_ext = gene.model_copy(update={"top_extension_mm": delta})
     z, r = effective_profile(g_ext)
@@ -169,7 +152,7 @@ def test_extension_spreads_taper_over_delta_max():
             g = json.load(f)["gene"]
         gene = Gene(**g)
     else:
-        gene = _sample_gene()
+        gene = sample_gene_profile()
 
     from backend.app.profile_extension import _compute_delta_max
 

@@ -11,6 +11,7 @@ from typing import Optional, Tuple
 
 import numpy as np
 
+from .config import REVOLVE_SEGMENTS
 from .mesh_plane_cut import clip_mesh_below_plane, mesh_volume
 from .mesh_revolve import revolve_mesh
 from .models import Gene, Metrics
@@ -43,7 +44,7 @@ def compute_metrics(
     z_cut = float(getattr(gene, "top_cut_height_mm", 0.0) or 0.0)
     angle = float(getattr(gene, "top_cut_angle_deg", 0.0) or 0.0)
 
-    verts, tris = revolve_mesh(z, r, radial_segments=96)
+    verts, tris = revolve_mesh(z, r, radial_segments=REVOLVE_SEGMENTS)
     cut_verts, cut_tris = clip_mesh_below_plane(verts, tris, z_cut, angle)
     volume, centroid_z = mesh_volume(cut_verts, cut_tris)
     z_max = float(np.max(cut_verts[:, 2])) if len(cut_verts) else 0.0

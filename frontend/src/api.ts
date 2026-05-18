@@ -8,6 +8,7 @@ import type {
   DesignDetail,
   GenerateResponse,
   ListResponse,
+  PatchDesignRequest,
 } from "./types";
 
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
@@ -36,15 +37,9 @@ export function getDesign(
   );
 }
 
-type PatchDesignPayload = {
-  top_extension_mm: number;
-  top_cut_height_mm: number;
-  top_cut_angle_deg: number;
-};
-
 export function patchDesign(
   designId: string,
-  payload: PatchDesignPayload,
+  payload: PatchDesignRequest,
 ): Promise<DesignDetail> {
   return jsonFetch<DesignDetail>(`/api/designs/${designId}`, {
     method: "PATCH",

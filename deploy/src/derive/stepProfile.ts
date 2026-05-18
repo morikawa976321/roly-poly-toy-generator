@@ -1,14 +1,14 @@
 /** Auto-synced from frontend/src/derive — npm run sync-core */
 
 /**
- * STEP エクスポート用プロファイル点列の間引きと B-spline エッジ生成。
+ * STEP エクスポート用 B-spline プロファイルエッジ。
  *
- * 役割: stepExporter が使う (z,r) 前処理と OCCT エッジ構築。
- * 働き: z 等間隔間引き・B-spline エッジ生成を提供する。点数上限で補間安定性を担保する。
+ * 役割: (z,r) 点列の間引きと OpenCascade スプラインエッジ生成。
+ * 働き: stepExporter が subsampleProfileUniformZ / makeProfileSplineEdge で母線を OCCT に渡す。
  */
 
 /** スプライン近似に渡す最大点数（多すぎると補間が不安定） */
-export const STEP_PROFILE_MAX_POINTS = 96;
+const STEP_PROFILE_MAX_POINTS = 96;
 
 /** z 等間隔に間引き（端点は必ず含める） */
 export function subsampleProfileUniformZ(

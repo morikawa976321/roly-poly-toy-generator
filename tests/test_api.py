@@ -12,36 +12,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from backend.app.main import create_app
-from backend.app.models import Gene, Metrics
 
-
-# ------------------------------- fixtures --------------------------------
-
-
-def _make_gene(**overrides) -> Gene:
-    data = dict(
-        version=2,
-        N=5,
-        height=30.0,
-        bottom_radius=0.0,
-        radii=[0.0, 5.0, 10.0, 5.0, 0.0],
-        z_warp=2.0,
-    )
-    data.update(overrides)
-    return Gene(**data)
-
-
-def _make_metrics(**overrides) -> Metrics:
-    data = dict(
-        volume=100.0,
-        height=30.0,
-        max_width=20.0,
-        centroid_z=10.0,
-        bottom_curvature_radius=25.0,
-        z_cog_max=12.5,
-    )
-    data.update(overrides)
-    return Metrics(**data)
+from tests.factories import make_gene, make_metrics
 
 
 @pytest.fixture
@@ -73,8 +45,8 @@ def test_get_design_returns_404_when_missing(
 def test_get_design_response_matches_design_detail(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    gene = _make_gene()
-    metrics = _make_metrics()
+    gene = make_gene()
+    metrics = make_metrics()
     created_at = "2026-04-24T12:00:00+00:00"
 
     def fake_get_design(design_id: str):
@@ -100,8 +72,8 @@ def test_patch_design_updates_extension(
 ) -> None:
     from backend.app.profile_extension import max_top_extension_mm
 
-    gene = _make_gene(top_extension_mm=0.0)
-    metrics = _make_metrics()
+    gene = make_gene(top_extension_mm=0.0)
+    metrics = make_metrics()
     created_at = "2026-04-24T12:00:00+00:00"
     stored = {"gene": gene, "metrics": metrics}
 
@@ -127,7 +99,7 @@ def test_patch_design_updates_extension(
     rich_gene = sample_gene(seed=42)
     rich_gene = rich_gene.model_copy(update={"top_extension_mm": 0.0})
     stored["gene"] = rich_gene
-    stored["metrics"] = _make_metrics(height=float(rich_gene.height))
+    stored["metrics"] = make_metrics(height=float(rich_gene.height))
 
     d_max = max_top_extension_mm(rich_gene)
     assert d_max > 0.5
@@ -166,8 +138,8 @@ def test_generate_rejects_too_many_parent_ids(client: TestClient) -> None:
 def test_generate_returns_400_with_missing_parents(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    present_gene = _make_gene()
-    present_metrics = _make_metrics()
+    present_gene = make_gene()
+    present_metrics = make_metrics()
 
     def fake_get_design(pid: str):
         if pid == "present":

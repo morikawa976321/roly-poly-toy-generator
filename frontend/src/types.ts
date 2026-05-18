@@ -14,3 +14,4 @@ export type DesignSummary = Schemas["DesignSummary"];
 export type DesignDetail = Schemas["DesignDetail"];
 export type ListResponse = Schemas["ListResponse"];
 export type GenerateResponse = Schemas["GenerateResponse"];
+export type PatchDesignRequest = Schemas["PatchDesignRequest"];

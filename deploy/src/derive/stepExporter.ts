@@ -1,16 +1,10 @@
 /** Auto-synced from frontend/src/derive — npm run sync-core */
 
 /**
- * STEP ファイルエクスポーター
+ * STEP AP214 エクスポート（OpenCascade.js WASM）。
  *
- * 役割: deploy 向け effective プロファイルの STEP AP214 出力。
- * 働き: exportGeneToStepBlob で opencascade.js (WASM) を lazy-load し回転体ソリッドを書き出す。
- * WASM は初回呼び出し時にのみロードされ、以降はキャッシュされる。
- *
- * opencascade.js (WASM ~65 MB) を lazy-load し、
- * effectiveProfile(gene) — ガウシアン+延長→B3 再フィット後の (z, r) から
- * OpenCascade の BRep カーネルで回転体ソリッドを構築、
- * STEPControl_Writer で STEP AP214 形式に書き出す。
+ * 役割: effective プロファイルから回転体ソリッドを構築し STEP バイナリを生成。
+ * 働き: DetailPage のダウンロードから lazy-load された opencascade.js で BRep 構築・top cut 適用。初回のみ WASM（~65MB）をロードし以降キャッシュ。
  */
 
 import type { Gene } from "@core/types";

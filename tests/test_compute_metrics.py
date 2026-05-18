@@ -6,24 +6,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from backend.app.metrics import compute_metrics
-from backend.app.models import Gene
 from backend.app.profile_extension import max_top_extension_mm
 
 
-@pytest.fixture
-def docs_gene() -> Gene:
-    path = Path("docs/designs/6d7afe17fed27c7c/gene.json")
-    if not path.is_file():
-        pytest.skip("docs design gene missing")
-    return Gene.model_validate_json(path.read_text())
-
-
-def test_extension_and_cut_affect_volume_and_centroid(docs_gene: Gene) -> None:
+def test_extension_and_cut_affect_volume_and_centroid(docs_gene) -> None:
     dmax = max_top_extension_mm(docs_gene)
     base = compute_metrics(docs_gene)
     extended = compute_metrics(
