@@ -694,10 +694,10 @@ feasibility フィールドは含まない。
 | 機能 | 実装 |
 |------|------|
 | 一覧サムネ | `frontend/src/derive/thumbnailSvg.ts` |
-| 3D ビュー | `frontend/src/components/ModelViewer.tsx` + `derive/mesh.ts` |
-| STL エクスポート | `derive/stlExporter.ts` |
-| STEP エクスポート | `derive/stepExporter.ts` |
+| 3D ビュー | `frontend/src/components/ModelViewer.tsx` + `derive/mesh.ts`（`ensureEffectiveProfile` で B3 effective） |
+| STEP エクスポート | `derive/stepExporter.ts` + `derive/stepProfile.ts`（`effectiveProfile` → B-spline 回転体） |
 | メトリクス表示 | `frontend/src/components/MetricsPanel.tsx` |
+| B3 再フィット | `derive/b3Pyodide.ts` + `derive/ensureB3Profile.ts` + `derive/b3ProfileCache.ts` |
 
 ## 20. 関連ソースファイル
 
@@ -706,9 +706,13 @@ feasibility フィールドは含まない。
 | `backend/app/identify.py` | design_id 導出 |
 | `backend/app/gene.py` | v2 gene 生成 |
 | `backend/app/shape.py` | パラメトリックプロファイル |
+| `backend/app/smoothing.py` | レガシー密化・ガウシアン・B3/B5・`effective_profile` |
+| `backend/app/profile_extension.py` | 上部延長・`effective_profile` |
 | `backend/app/physics.py` | feasibility 判定 |
 | `backend/app/metrics.py` | 体積・重心計算 |
 | `backend/app/storage.py` | SQLite 永続化 |
 | `backend/app/api.py` | REST API |
+| `frontend/src/derive/smoothing.ts` | TS 版平滑化（backend と整合） |
+| `tools/compare_profile_smoothing.py` | 本デザインの平滑化バリアント比較図 |
 | `data/app.db` | ローカル DB（git 管理外） |
 

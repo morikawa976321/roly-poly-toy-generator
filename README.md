@@ -161,13 +161,14 @@ npm run package:windows
 
 | モジュール | 役割 |
 | --- | --- |
-| `smoothing.ts` / `profileExtension.ts` | 密プロファイル・上部延長 |
+| `smoothing.ts` / `profileExtension.ts` | レガシー密プロファイル・上部延長 |
+| `b3Pyodide.ts` / `ensureB3Profile.ts` / `b3ProfileCache.ts` | Pyodide + SciPy で B3 再フィット（本番 effective profile） |
 | `meshPlaneCut.ts` | 子午面カット・3D 平面クリップ |
 | `mesh.ts` / `meshMetrics.ts` | watertight 回転体・体積・断面 |
 | `physics.ts` / `feasibilityMetrics.ts` | feasibility・z_cog_max 等 |
 | `metrics.ts` | プレビュー用 metrics（保存前も即時計算） |
 | `thumbnailSvg.ts` | 断面 SVG（ミラー + マーカー） |
-| `stepExporter.ts` | STEP Blob（opencascade.js） |
+| `stepProfile.ts` / `stepExporter.ts` | STEP 用プロファイル間引き・B-spline エッジ・Blob 出力（opencascade.js） |
 
 ### 生成・保存
 
@@ -190,6 +191,7 @@ npm run package:windows
 | Frontend | Vite 5 / React 18 / TypeScript / Tailwind CSS v4 / Vitest |
 | 3D | three.js 0.169 / react-three-fiber / @react-three/drei |
 | CAD 出力 | opencascade.js（ブラウザ内 STEP 生成） |
+| B3 平滑化 | Pyodide + SciPy（ブラウザ内 UnivariateSpline 再フィット） |
 | 型生成 | openapi-typescript + CI で `generated/` のドリフト検知 |
 | 配布 | PyInstaller + `frontend/dist` 同梱 |
 | 公開（任意） | `deploy/` → Vercel 静的ホスティング |
@@ -237,7 +239,7 @@ roly-poly-toy-generator/
 │   │   ├── profile_cut.py          # 子午面プロファイルへの傾斜カット
 │   │   ├── profile_extension.py    # 上部延長（C² 5次外挿）と feasibility 用プロファイル
 │   │   ├── shape.py                # パラメトリック形状族（球キャップ+5次テーパ）と高さ最適化
-│   │   ├── smoothing.py            # gene の radii → 密プロファイル補間
+│   │   ├── smoothing.py            # レガシー密化・ガウシアン・B3/B5・effective_profile
 │   │   └── storage.py              # SQLite CRUD（designs テーブル）
 │   └── scripts/
 │       └── export_openapi.py       # OpenAPI スキーマ JSON 出力
@@ -256,8 +258,8 @@ roly-poly-toy-generator/
 │       ├── main.tsx
 │       ├── index.css
 │       ├── design.json             # 埋め込みデザインデータ
-│       └── derive/
-│           ├── stepExporter.ts     # STEP 出力（frontend から sync-core で同期）
+│       └── derive/                 # frontend derive のサブセット（sync-core-derive で同期）
+│           ├── stepExporter.ts     # STEP 出力
 │           └── stepProfile.ts      # STEP 用プロファイル間引き・B-spline エッジ
 ├── docs/
 │   └── designs/
@@ -283,21 +285,27 @@ roly-poly-toy-generator/
 │       │   ├── MetricsPanel.tsx    # 詳細画面の指標パネル
 │       │   └── ModelViewer.tsx     # 3D ビューア（react-three-fiber + OrbitControls）
 │       ├── derive/
-│       │   ├── mesh.ts             # gene → watertight 回転体メッシュ（three.js）
+│       │   ├── mesh.ts                 # gene → watertight 回転体メッシュ（three.js）
 │       │   ├── mesh.test.ts
-│       │   ├── meshMetrics.ts      # メッシュからの断面・体積・重心算出
-│       │   ├── meshPlaneCut.ts     # 子午面カット・3D 平面クリップ
-│       │   ├── smoothing.ts        # gene の radii → 密プロファイル補間（TS 版）
+│       │   ├── meshMetrics.ts          # メッシュからの断面・体積・重心算出
+│       │   ├── meshPlaneCut.ts         # 子午面カット・3D 平面クリップ
+│       │   ├── smoothing.ts            # レガシー密化・ガウシアン平滑・B3 パラメータ
 │       │   ├── smoothing.test.ts
-│       │   ├── profileExtension.ts # 上部延長（C² 5次外挿）
-│       │   ├── physics.ts          # プロファイルからの feasibility 判定
-│       │   ├── metrics.ts          # プロファイルからの体積・高さ等
+│       │   ├── profileExtension.ts     # 上部延長（C² 5次外挿）・effectiveProfile
+│       │   ├── b3Pyodide.ts            # Pyodide + SciPy で B3 UnivariateSpline 再フィット
+│       │   ├── b3ProfileCache.ts       # effective (z, r) のメモリキャッシュ
+│       │   ├── ensureB3Profile.ts      # レガシー+B3 を previewGene 単位で確保
+│       │   ├── physics.ts              # プロファイルからの feasibility 判定
+│       │   ├── metrics.ts              # プロファイルからの体積・高さ等
 │       │   ├── metrics.test.ts
 │       │   ├── feasibilityMetrics.ts   # カット後 z_cog_max 等（gene 一括算出）
 │       │   ├── feasibilityMetrics.test.ts
-│       │   ├── stepExporter.ts     # gene → STEP Blob（opencascade.js）
-│       │   ├── thumbnailSvg.ts   # gene → 断面 SVG（両側ミラー + 重心マーカー）
-│       │   └── thumbnailSvg.test.ts
+│       │   ├── stepProfile.ts          # STEP 用プロファイル間引き・B-spline エッジ
+│       │   ├── stepExporter.ts         # effectiveProfile → STEP Blob（opencascade.js）
+│       │   ├── thumbnailSvg.ts         # gene → 断面 SVG（両側ミラー + 重心マーカー）
+│       │   ├── thumbnailSvg.test.ts
+│       │   └── fixtures/
+│       │       └── b3_profile_reference.json  # B3 再フィットの参照テストデータ
 │       ├── generated/
 │       │   ├── openapi.json        # Backend から取得した OpenAPI スキーマ
 │       │   └── api-schema.ts       # openapi-typescript で生成した型定義
@@ -326,8 +334,14 @@ roly-poly-toy-generator/
 │   ├── stop.mjs                    # 孤児プロセス回収
 │   └── package-windows.ps1         # Windows zip 配布ビルド
 ├── tools/
-│   ├── debug_cut_zcog.py           # カットが z_cog_max に与える影響のデバッグ
-│   └── oc-apis.txt                 # opencascade.js API リファレンス（ローカル用）
+│   ├── compare_profile_smoothing.py  # 平滑化バリアント比較 PNG（current / B3 / B5 / prod）
+│   ├── export_step_variants.py       # 複数プロファイル手法の STEP 一括出力（Python オーケストレータ）
+│   ├── export_step_occt.mjs          # (z, r) JSON → STEP（Node + opencascade.js）
+│   ├── occt-loader.mjs               # opencascade.js WASM の動的 import ヘルパ
+│   ├── occt-register.mjs             # Vite / Node 向け WASM 登録
+│   ├── debug_cut_zcog.py             # カットが z_cog_max に与える影響のデバッグ
+│   ├── oc-apis.txt                   # opencascade.js API リファレンス（ローカル用）
+│   └── output/                       # 検証用 PNG / STEP / profiles JSON（任意・git 管理外推奨）
 ├── data/
 │   └── app.db                      # ローカル SQLite DB（git 管理外）
 ├── build/                          # PyInstaller 出力・配布 zip（git 管理外）
