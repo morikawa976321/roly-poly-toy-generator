@@ -1,3 +1,9 @@
+"""metrics.compute_metrics の基本不変条件テスト。
+
+役割: 体積・幅・重心などメトリクス出力の健全性検証。
+働き: 単純な Gene で compute_metrics を呼び、有限・非負・重心 z が高さ内にあることを確認する。
+"""
+
 import math
 
 from backend.app.metrics import compute_metrics

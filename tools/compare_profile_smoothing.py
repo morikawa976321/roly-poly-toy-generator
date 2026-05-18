@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """プロファイル平滑化と本番 effective の子午面断面を PNG に出力する。
 
+役割: 平滑化手法比較のオフライン可視化ツール。
+働き: CLI から gene を読み current/B3/B5/prod 各プロファイルを PNG に描画する。
+研究・チューニング用で本番 API には組み込まない。
+
   1. current … 線形密化 + インデックス空間ガウシアン σ=24（延長の基準）
   5. B3      … 64 制御点 smoothing spline (s 指定) → 密サンプル（延長なし本体）
   7. B5      … PCHIP → z 等間隔 96 点 → smoothing spline → 密サンプル

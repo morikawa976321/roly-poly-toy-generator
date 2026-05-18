@@ -1,3 +1,9 @@
+/**
+ * バックエンド REST API クライアント。
+ *
+ * 役割: /api/* への fetch ラッパと型付きレスポンス。
+ * 働き: GalleryPage・DetailPage などから list/get/patch/generate/delete/exit を呼ぶ。エラー時は HTTP ステータス付き Error を投げる。
+ */
 import type {
   DesignDetail,
   GenerateResponse,

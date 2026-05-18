@@ -1,8 +1,8 @@
-"""Metrics computation from gene.
+"""
+gene から数値メトリクスを計算。
 
-This module is intentionally backend-only and limited to numeric metrics
-needed for storage / API responses. Asset generation (SVG/mesh) is
-handled in the frontend per README.md.
+役割: 体積・高さ・最大幅・重心 z など API / SQLite 用の指標。
+働き: ``effective_profile`` 経由で密プロファイルから算出。SVG・メッシュ描画はフロント担当（README 準拠）。
 """
 
 from __future__ import annotations

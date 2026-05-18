@@ -1,3 +1,9 @@
+"""storage.update_design の部分更新テスト。
+
+役割: PATCH 相当の DB 更新パスの検証。
+働き: update_design が created_at を保持し、gene/metrics の変更が永続化されることを確認する。
+"""
+
 from __future__ import annotations
 
 from pathlib import Path

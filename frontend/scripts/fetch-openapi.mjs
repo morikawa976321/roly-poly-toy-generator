@@ -1,3 +1,9 @@
+/**
+ * バックエンド OpenAPI スキーマの取得。
+ *
+ * 役割: frontend/src/generated/openapi.json の更新スクリプト。
+ * 働き: 起動中の FastAPI から /openapi.json を fetch し gen:types の入力を用意する。
+ */
 import { mkdir, writeFile } from "node:fs/promises";
 
 const OPENAPI_URL =

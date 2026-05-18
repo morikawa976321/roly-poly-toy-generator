@@ -1,3 +1,9 @@
+/**
+ * Vite ビルド・開発サーバー設定。
+ *
+ * 役割: React + Tailwind + WASM のフロントエンド bundler 設定。
+ * 働き: dev 時 port 5173、/api を backend :8000 にプロキシ。opencascade.js と pyodide を optimizeDeps 除外。
+ */
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";

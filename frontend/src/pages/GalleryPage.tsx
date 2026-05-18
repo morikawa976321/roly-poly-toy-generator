@@ -1,3 +1,9 @@
+/**
+ * デザイン一覧（ギャラリー）ページ。
+ *
+ * 役割: 生成・削除・選択のメイン画面（ルート `/`）。
+ * 働き: listDesigns で一覧取得、Pyodide B3 初期化とサムネ prefetch、DesignCard グリッドを描画する。
+ */
 import { useCallback, useEffect, useState } from "react";
 import type { DesignSummary } from "../types";
 import { deleteAllDesigns, generateDesigns, listDesigns } from "../api";

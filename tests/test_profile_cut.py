@@ -1,3 +1,10 @@
+"""メッシュ平面カットと design_id 除外のテスト。
+
+役割: profile_cut / mesh_plane_cut 連携の検証。
+働き: 水平・傾斜カットでメッシュ高さ・対称性・cap の水密性を確認し、
+カットフィールドが design_id に含まれないことを検証する。
+"""
+
 import math
 
 import numpy as np

@@ -1,4 +1,8 @@
-"""`backend/app/storage.py` のローカル SQLite 永続化テスト。"""
+"""`backend/app/storage.py` のローカル SQLite 永続化テスト。
+
+役割: storage レイヤの CRUD 契約検証。
+働き: 一時 DB fixture で upsert/list/delete の決定性と既存行の上書き防止を確認する。
+"""
 
 from __future__ import annotations
 

@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 """手法 1 / 5 / 7 のプロファイルで STEP を tools/output/ に書き出す（アプリ本体と独立）。
 
+役割: 平滑化バリアント別 STEP 出力のオフライン比較ツール。
+働き: compare_profile_smoothing の PROFILE_FNS を使い Node opencascade 経由で STEP を生成する。
+本番 export パイプラインとは独立。
+
   1. current … smooth_profile（現行ガウシアン）
   5. b3      … smoothing spline on 64 nodes
   7. b5      … PCHIP → 96 pts → smoothing spline

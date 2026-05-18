@@ -1,3 +1,9 @@
+/**
+ * 断面 SVG サムネイル生成。
+ *
+ * 役割: ギャラリー・詳細の 2D 断面プレビュー文字列。
+ * 働き: effectiveProfile と top cut から SVG を組み立て data URL 化。backend/app/thumbnail.py の TS ポート。
+ */
 import type { Gene, Metrics } from "../types";
 import {
   cutProfileSilhouette,
@@ -24,7 +30,6 @@ function topCutEdgePoints(
   return pts;
 }
 
-// backend/app/thumbnail.py::render_thumbnail_svg の TS ポート
 export function thumbnailSvg(gene: Gene, metrics: Metrics): string {
   const { z, r } = effectiveProfile(gene);
   const { zCut, tanA } = geneTopCutParams(gene);

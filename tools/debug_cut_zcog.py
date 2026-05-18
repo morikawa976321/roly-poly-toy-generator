@@ -1,4 +1,8 @@
-"""Debug: when does cut change z_cog_max?"""
+"""カット・延長が z_cog_max に与える影響の ad-hoc デバッグ脚本。
+
+役割: feasibility_metrics 不具合調査用の一時スクリプト。
+働き: 直接実行で seed 固定 gene に対しカット高さスイープを標準出力する。pytest には含めない。
+"""
 import numpy as np
 from backend.app.gene import sample_gene_with_feasibility
 from backend.app.profile_extension import feasibility_profile, max_top_extension_mm

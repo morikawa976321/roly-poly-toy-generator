@@ -1,3 +1,9 @@
+/**
+ * thumbnailSvg の単体テスト。
+ *
+ * 役割: 傾斜上面カットが断面 SVG に反映されることの回帰テスト。
+ * 働き: vitest が SVG polygon 点列と cutProfileSilhouette の一致を検証する。
+ */
 import { describe, expect, it } from "vitest";
 import geneJson from "../../../docs/designs/6d7afe17fed27c7c/gene.json";
 import type { Gene } from "../types";

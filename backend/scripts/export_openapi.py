@@ -1,3 +1,10 @@
+"""
+FastAPI OpenAPI 仕様のオフライン出力。
+
+役割: フロント型生成用の OpenAPI JSON をリポジトリへ書き出す CLI。
+働き: ``main.app`` を import し ``app.openapi()`` を指定パスへ保存。リポジトリルートを ``sys.path`` に追加して実行可能。
+"""
+
 from __future__ import annotations
 
 import json

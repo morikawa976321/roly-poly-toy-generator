@@ -1,4 +1,9 @@
-"""子午面プロファイル (z, r) への傾斜カット（frontend meshPlaneCut.ts と同等）。"""
+"""
+子午面プロファイルへの傾斜カット。
+
+役割: (z, r) 半断面への平面カット幾何（右/左シルエット）。
+働き: フロント ``meshPlaneCut.ts`` と同等。``feasibility_metrics`` がカット後プロファイルを組み立てる際に利用。
+"""
 
 from __future__ import annotations
 

@@ -1,3 +1,9 @@
+/**
+ * アプリケーションルート（ルーティング・ヘルス維持・終了）。
+ *
+ * 役割: SPA の最上位シェルと `/` / `/designs/:id` のルート定義。
+ * 働き: main.tsx からマウント。タブ表示中は /health を定期 ping しアイドル終了を防ぐ。終了ボタンで exitApp API を呼ぶ。
+ */
 import { Link, Route, Routes } from "react-router-dom";
 import { useEffect } from "react";
 import GalleryPage from "./pages/GalleryPage";

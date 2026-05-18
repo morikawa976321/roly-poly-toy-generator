@@ -1,6 +1,11 @@
+/**
+ * プロファイル平滑化（SciPy 非依存・backend 同等）。
+ *
+ * 役割: gene の (z,r) ノード列のガウシアン平滑と B3 定数定義。
+ * 働き: profileExtension・b3Pyodide・feasibility が smoothProfile / geneZNodes を使用。backend/app/smoothing.py と意図的に同等挙動。
+ */
 import type { Gene } from "../types";
 
-// backend/app/smoothing.py と同等の挙動（SciPy-free）。
 export const DENSE_FACTOR = 24;
 /** 手法 5 (B3): 64 制御点 smoothing spline — compare_profile_smoothing と同じ */
 export const B3_SPLINE_S = 0.8;

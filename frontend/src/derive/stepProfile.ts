@@ -1,5 +1,8 @@
 /**
- * STEP エクスポート用プロファイル点列の間引きと B-spline エッジ生成。
+ * STEP エクスポート用 B-spline プロファイルエッジ。
+ *
+ * 役割: (z,r) 点列の間引きと OpenCascade スプラインエッジ生成。
+ * 働き: stepExporter が subsampleProfileUniformZ / makeProfileSplineEdge で母線を OCCT に渡す。
  */
 
 /** スプライン近似に渡す最大点数（多すぎると補間が不安定） */

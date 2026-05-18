@@ -1,4 +1,9 @@
-/** opencascade.wasm.js が ESM で __dirname を参照するため、読み込み時に注入する */
+/**
+ * Node 用 opencascade.js ローダフック。
+ *
+ * 役割: export_step_occt.mjs 実行時の WASM モジュール読み込み補助。
+ * 働き: occt-register 経由で register され、opencascade.wasm.js に __dirname を注入する。
+ */
 import { fileURLToPath } from "node:url";
 
 export async function load(url, context, nextLoad) {

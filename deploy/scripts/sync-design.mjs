@@ -1,3 +1,9 @@
+/**
+ * リファレンスデザインを deploy 用 JSON に同期。
+ *
+ * 役割: Vercel 静的ビューアへの埋め込みデータ生成。
+ * 働き: docs/designs/6d7afe17fed27c7c/dump.json を deploy/src/design.json に書き出す。
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";

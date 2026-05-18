@@ -1,3 +1,9 @@
+/**
+ * レガシー母線 + B3 再フィットのオンデマンド確保。
+ *
+ * 役割: 表示・メッシュ前に effective プロファイルをキャッシュへ投入する。
+ * 働き: legacyMeshProfile → b3RefitProfileAsync の inflight 重複排除。initB3Pyodide を re-export。
+ */
 import type { Gene } from "../types";
 import {
   effectiveGeneKey,

@@ -1,7 +1,6 @@
 """
 backend パッケージ。
 
-このリポジトリでは `backend/app/*.py` をモジュールとして直接参照したいことがあるため、
-`backend/` を Python パッケージとして扱えるようにする。
+役割: リポジトリの Python バックエンドルート。
+働き: ``backend/app`` をパッケージとして import 可能にする。配布版 launcher から ``backend.app`` を参照する。
 """
-

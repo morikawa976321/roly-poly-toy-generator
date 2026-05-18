@@ -1,3 +1,11 @@
+/**
+ * deploy パッケージの Vite 設定。
+ *
+ * 役割: 静的デプロイ用フロントエンドのビルド定義。
+ * 働き: @core を frontend/src へエイリアスし wasm/react/tailwind を有効化する。
+ * opencascade.js / pyodide は optimizeDeps から除外する。
+ */
+
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";

@@ -1,4 +1,8 @@
-"""compute_metrics が延長・カットを固体メトリクスに反映すること。"""
+"""compute_metrics が延長・カットを固体メトリクスに反映すること。
+
+役割: metrics.compute_metrics の統合テスト。
+働き: 参照 gene で延長・カットを変え、体積・重心・高さがプロファイル変更に追従することを確認する。
+"""
 
 from __future__ import annotations
 

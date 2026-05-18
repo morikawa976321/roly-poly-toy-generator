@@ -1,3 +1,9 @@
+/**
+ * computeMetrics / geneWithModifications の単体テスト。
+ *
+ * 役割: メトリクス計算が延長・カットで変化することの回帰テスト。
+ * 働き: vitest が fixture gene.json で volume・centroid・z_cog_max を検証する。
+ */
 import { describe, expect, it } from "vitest";
 import geneJson from "../../../docs/designs/6d7afe17fed27c7c/gene.json";
 import type { Gene } from "../types";

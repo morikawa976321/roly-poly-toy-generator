@@ -1,12 +1,8 @@
-"""gene から decisive（決定的）に design_id を導出する。
+"""
+gene から決定的 design_id を導出。
 
-ルール（README.md 参照）:
-- gene を正規形の JSON 文字列にする（キーをソート、浮動小数は
-  ``GENE_FLOAT_DECIMALS`` 桁で丸める）。
-- SHA-256 でハッシュし、先頭 ``DESIGN_ID_HEX_LENGTH`` 桁の 16 進を取る。
-
-これによって、プラットフォーム・Python のバージョン・dict への挿入順序に
-依らず、同じ gene には同じ短い ID が付く。
+役割: 形状本体（延長・カット除く）の正規化ハッシュ ID。
+働き: gene をキーソート・浮動小数丸めの JSON にし SHA-256 先頭 hex を返す。``api`` / ``storage`` の主キーに使う。
 """
 
 from __future__ import annotations

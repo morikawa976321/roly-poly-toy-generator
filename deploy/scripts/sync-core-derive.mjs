@@ -1,5 +1,8 @@
 /**
- * frontend/src/derive の STEP 関連ファイルを deploy 用に同期（import を @core に差し替え）
+ * frontend derive の STEP モジュールを deploy 向けに同期。
+ *
+ * 役割: deploy/src/derive のソース更新（sync-core npm script）。
+ * 働き: stepExporter / stepProfile をコピーし import を @core に差し替え、Auto-synced ヘッダを付与する。
  */
 import fs from "node:fs";
 import path from "node:path";

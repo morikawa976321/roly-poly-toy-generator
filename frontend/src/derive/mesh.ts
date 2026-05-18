@@ -1,3 +1,9 @@
+/**
+ * gene から Three.js 回転体メッシュを生成。
+ *
+ * 役割: 3D 表示とメトリクス計算のジオメトリ源。
+ * 働き: effectiveProfile を回転し top cut で clipGeneMesh。revolutionGeometryFromGene / cappedGeometryFromGene を公開。
+ */
 import type { Gene } from "../types";
 import * as THREE from "three";
 import { effectiveProfile } from "./profileExtension";

@@ -1,15 +1,11 @@
-// 開発サーバのオーケストレータ。
-// バックエンド（uvicorn）とフロントエンド（vite）を直接の子プロセスとして
-// 起動し、SIGINT / SIGTERM / exit のタイミングでプロセスツリーごと確実に
-// 終了させる。このラッパーが必要な理由:
-// - `uvicorn --reload` は watchfiles 経由で multiprocessing の子プロセスを
-//   さらに spawn する。
-// - Windows では cmd / npm / python / uv と多層を挟むと Ctrl+C がうまく
-//   伝搬しきらず、素直に組むとポート 8000 / 5173 を握ったままの子プロセスが
-//   残ってしまう。
-//
-// Windows では各子に対して `taskkill /T /F` で子孫まで巻き込んで殺し、
-// POSIX では `child.kill()` で終了させる。
+/**
+ * 開発サーバのオーケストレータ。
+ *
+ * 役割: `npm run dev` のエントリ（backend + frontend 同時起動）。
+ * 働き: uvicorn / vite を子プロセスで起動し SIGINT 時にプロセスツリーごと終了する。
+ *   uvicorn --reload の孫プロセスや Windows 多層 spawn で Ctrl+C が届かない問題を
+ *   taskkill /T /F（Windows）または child.kill()（POSIX）で回避する。
+ */
 
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";

@@ -1,4 +1,8 @@
-"""gene 生成（v2 ハイブリッド）の統計的テスト。"""
+"""gene 生成（v2 ハイブリッド）の統計的テスト。
+
+役割: gene サンプリング・繁殖の品質保証。
+働き: sample_gene / breed の形状不変条件、seed 再現性、一括サンプルの feasibility 通過を検証する。
+"""
 
 from __future__ import annotations
 

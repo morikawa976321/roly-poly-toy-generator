@@ -1,6 +1,9 @@
-"""回転体メッシュを 3D 平面でカット（フロント meshPlaneCut.ts と同等）。"""
+"""
+回転体メッシュの 3D 平面カット。
 
-
+役割: 上部傾斜カット・平面クリップの三角メッシュ幾何。
+働き: フロント ``meshPlaneCut.ts`` と同等。``feasibility_metrics`` / ``metrics`` がカット後形状を得る際に呼ぶ。
+"""
 
 from __future__ import annotations
 

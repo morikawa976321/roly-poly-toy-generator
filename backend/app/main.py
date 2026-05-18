@@ -1,4 +1,9 @@
-"""FastAPI アプリのエントリポイント。"""
+"""
+FastAPI アプリの組み立て。
+
+役割: HTTP サーバ本体（API ルータ・静的配信・CORS・アイドル監視）。
+働き: ``create_app`` で FastAPI インスタンスを構築。uvicorn / ``launcher`` / OpenAPI 出力スクリプトの import 先。
+"""
 
 from __future__ import annotations
 

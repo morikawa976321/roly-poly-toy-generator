@@ -1,5 +1,8 @@
 """`backend/app/identify.py` の `design_id_for` の安定性テスト。
 
+役割: design_id 導出の決定性・丸め閾値の契約テスト。
+働き: 同一 gene・dict 挿入順・浮動小数桁境界で ID が期待どおり変化/不変になることを保証する。
+
 永続化キー（design_id）は入力 gene から決定的に導出されるため、
 - 同一 gene → 常に同一 ID
 - dict 挿入順やバージョン差に依存しない

@@ -1,3 +1,9 @@
+/**
+ * feasibility 用メトリクス（z_cog_max・底面曲率半径）。
+ *
+ * 役割: カット有無に応じた feasibility プロファイルから付加 Metrics を算出。
+ * 働き: computeMetrics が feasibilityExtrasForGene を併用。mesh シルエットと physics を橋渡し。
+ */
 import type { Gene, Metrics } from "../types";
 import { revolutionGeometryFromProfile } from "./mesh";
 import { silhouetteFromGeometry } from "./meshMetrics";

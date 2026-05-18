@@ -1,3 +1,9 @@
+/**
+ * ギャラリー用デザインカード。
+ *
+ * 役割: 一覧グリッドの 1 件表示（サムネ・選択・リンク）。
+ * 働き: B3 プロファイル確保後 thumbnailSvg で SVG サムネを描画。DetailPage への Link と複数選択チェックを提供。
+ */
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { DesignSummary } from "../types";

@@ -1,10 +1,8 @@
-"""プレプロトタイプ用の HTTP API。
+"""
+プレプロトタイプ用 HTTP API ルータ。
 
-エンドポイント:
-    POST /api/designs/generate  -> N 個のデザインを生成し、サマリを返す
-    GET  /api/designs           -> 一覧（新しい順、ページング対応）
-    GET  /api/designs/{id}      -> 詳細（gene・metrics）
-    PATCH /api/designs/{id}     -> 上部延長量の更新
+役割: デザイン生成・一覧・詳細・更新・全削除の REST エンドポイント。
+働き: FastAPI ``APIRouter``。``gene`` / ``metrics`` / ``storage`` を呼び出し JSON を返す（generate はバックグラウンド upsert）。
 """
 
 from __future__ import annotations

@@ -1,3 +1,9 @@
+/**
+ * 回転体メッシュ・上面カットの単体テスト。
+ *
+ * 役割: cappedGeometryFromGene の水密性とカット平面の幾何検証。
+ * 働き: vitest が indexed geometry の辺共有と signedCutDist 整合を検査する。
+ */
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import type { Gene } from "../types";

@@ -1,27 +1,8 @@
-"""球キャップ底 + 5次テーパのパラメトリック形状族（v2 gene の生成基盤）。
+"""
+球キャップ底＋5次テーパのパラメトリック形状族。
 
-形状の構成:
-    z ∈ [0, z_cap_end]       : 半径 rb の球面 r(z) = sqrt(2·rb·z - z²)
-    z ∈ [z_cap_end, height]  : 端点で (r, dr/dz, d²r/dz²) を球面と一致させる
-                               5次多項式で r_cap_end → rt までテーパ
-
-ランダム化パラメータ:
-    rb                    : 球面半径（SPHERE_RB_MIN..MAX）
-    cap_angle_deg         : 球キャップの極角（CAP_ANGLE_MIN..MAX、TILT_MAX_DEG+3° 以上）
-    rt                    : 上端半径。球キャップ終端半径 r_cap_end に対する
-                            比 ``RT_RATIO_MIN..MAX`` をサンプルして決める。スケール不変に
-                            「尖り〜ずん胴」の全域をカバーでき、見た目の多様性を出せる。
-    top_tangent_angle_deg : 上端における子午線の接線角（水平基準,
-                            TOP_TANGENT_ANGLE_MIN..MAX_DEG）。0° で水平着地（平坦な天面,
-                            従来挙動）、正の値で肩が外向きに落ちた truncated dome 風。
-                            慣性モーメント経由で揺れ周期にも直接効く。
-    delta_target          : 狙いの delta = rb - z_com（DELTA_TARGET_MIN..MAX）
-
-delta_target を達成するよう、全体高さ ``height`` を二分探索で調整する
-（高さを上げるほど上部の体積比が増えて重心が上がり、delta が小さくなる）。
-
-元実装は ``generate_roly_poly_stl.py``（独立スクリプト）。本モジュールはそれを
-NumPy 化・再利用できる形で抽出し、backend の生成パイプラインから呼ばれる。
+役割: v2 gene 生成の形状数学（球面＋C² テーパ、height 最適化）。
+働き: ``sample_shape_params`` と ``tune_height_for_delta`` で密 (z, r) を生成。``gene`` が N_NODES へダウンサンプルする。
 """
 
 from __future__ import annotations

@@ -1,3 +1,11 @@
+/**
+ * 静的デプロイ用の単一設計ビューア UI。
+ *
+ * 役割: deploy ビルドのルート React 画面（design.json 固定）。
+ * 働き: 延長・カットのプレビュー、メトリクス表示、STEP ダウンロードを提供する。
+ * frontend core を @core エイリアスで再利用する。
+ */
+
 import {
   useCallback,
   useEffect,

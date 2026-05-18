@@ -1,3 +1,9 @@
+/**
+ * feasibilityExtrasForGene の単体テスト。
+ *
+ * 役割: 傾斜カットが z_cog_max に与える影響の回帰テスト。
+ * 働き: vitest が fixture gene で uncut/cut の feasibility 付加値を比較する。
+ */
 import { describe, expect, it } from "vitest";
 import geneJson from "../../../docs/designs/6d7afe17fed27c7c/gene.json";
 import type { Gene } from "../types";

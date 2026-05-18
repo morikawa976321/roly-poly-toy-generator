@@ -1,4 +1,9 @@
-"""API 層で使う Pydantic モデル群。"""
+"""
+API 入出力の Pydantic スキーマ。
+
+役割: Gene / Metrics / 各 Request・Response の型定義。
+働き: ``api`` / ``storage`` / ``gene`` がシリアライズ・検証に利用。Gene は v1/v2 プロファイルと延長・カット参量を保持する。
+"""
 
 from __future__ import annotations
 

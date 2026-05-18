@@ -1,3 +1,9 @@
+"""effective_profile と上部延長（quintic + B3 再フィット）のテスト。
+
+役割: profile_extension モジュールの幾何・数値契約の検証。
+働き: legacy→B3 再フィット、延長の単調性/C2、最大延長端点、本番延長形状の回帰を確認する。
+"""
+
 import math
 
 import numpy as np

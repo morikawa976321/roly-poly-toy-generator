@@ -1,8 +1,8 @@
-"""上部延長とメッシュ用 effective プロファイル。
+"""
+上部延長とメッシュ用 effective プロファイル。
 
-メッシュ / STEP / 3D（``effective_profile``）:
-  1. ``smooth_profile`` + 現行 5 次延長でレガシー (z,r) を生成
-  2. その密サンプル列に B3（``b3_refit_profile``）で再フィット → 1 本のスプライン
+役割: gene のベース形状に上部延長を付与した密 (z, r) を提供。
+働き: smooth + 5次延長のあと B3 再フィットで 1 本化。``metrics`` / メッシュ・STEP 下流が ``effective_profile`` を参照する。
 """
 
 from __future__ import annotations

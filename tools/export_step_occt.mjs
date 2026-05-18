@@ -1,8 +1,9 @@
 /**
  * (z, r) プロファイルから opencascade.js で STEP を書き出す（CLI, Node ESM）。
  *
- * Usage (repo root):
- *   node tools/export_step_occt.mjs <profiles.json> <methodKey> <out.step>
+ * 役割: ブラウザ外（Node）での STEP 検証・バッチ出力。
+ * 働き: export_step_variants.py から profiles JSON を受け取り OCCT で回転体を構築して .step を書く。
+ *   使い方: node tools/export_step_occt.mjs <profiles.json> <methodKey> <out.step>
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";

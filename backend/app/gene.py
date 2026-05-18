@@ -1,23 +1,8 @@
-"""gene のランダム生成（v2: 球キャップ+5次テーパのパラメトリック族）。
+"""
+v2 gene のランダム生成と交配。
 
-v2 gene は [0, height] を等分した z 軸上に ``N_NODES`` 個の制御点 radii を持つ
-プロファイルで、以下を満たす:
-
-    r[0] = 0        （底は球キャップの最下点 = 極点）
-    r[N-1] = rt     （上端。テーパ終端。rt=0 で尖らせることも可）
-    単峰                 （途中で一度だけ最大）
-
-生成手順:
-    1. ``sample_shape_params()`` で (rb, cap_angle, rt, delta_target) を引く
-    2. ``tune_height_for_delta()`` で height を選ぶ（案C: 細長さ/成立性/δ目標を同時に評価）
-       → 密プロファイル (z_dense, r_dense) が得られる
-    3. ``profile_to_radii()`` で N_NODES 点に等間隔ダウンサンプル
-    4. 小さなランダム摂動（単峰性維持）を乗せて個体差を出す
-    5. ``rolypoly_feasibility(gene, theta_max_deg=TILT_MAX_DEG)`` で θ_max=75°
-       の自己復元条件を確認。不合格なら再サンプル（最大 ``FEASIBILITY_MAX_RETRY`` 回）。
-
-v1 の折れ線ランダム生成関数は廃止した（既存 v1 gene は ``version`` フィールドで
-区別され、読み取りは引き続き可能）。
+役割: 球キャップ＋5次テーパ族から ``N_NODES`` 制御点の gene を生成・交叉。
+働き: ``shape`` で密プロファイルを作りダウンサンプル後、θ≤75° の feasibility を満たすまで再試行。v1 gene の読み取りは ``version`` で区別。
 """
 
 from __future__ import annotations

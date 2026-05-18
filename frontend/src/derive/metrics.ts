@@ -1,3 +1,9 @@
+/**
+ * gene から最終形状メトリクスを算出。
+ *
+ * 役割: 体積・寸法・重心と feasibility 付加値のフロント計算窓口。
+ * 働き: カット後メッシュと feasibility プロファイルから Metrics を組み立てる。geneWithModifications でプレビュー用 gene を合成。
+ */
 import type { Gene, Metrics } from "../types";
 import { cappedGeometryFromGene } from "./mesh";
 import { metricsFromGeometryWithFeas } from "./meshMetrics";

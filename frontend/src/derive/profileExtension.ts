@@ -1,7 +1,8 @@
 /**
- * 上部延長（レガシー）とメッシュ用 effective プロファイル。
+ * 上部延長とメッシュ/feasibility 用 effective プロファイル。
  *
- * effective: smoothProfile + 延長 → 密 (z,r) → B3 再フィット（1 本のスプライン）
+ * 役割: ガウシアン平滑 + 延長 → B3 再フィット後の (z,r) を組み立てる。
+ * 働き: mesh・thumbnail・feasibility が effectiveProfile / legacyMeshProfile / feasibilityProfile を参照。maxTopExtensionMm 等の編集制約もここ。
  */
 import type { Gene } from "../types";
 import { getEffectiveProfile } from "./b3ProfileCache";

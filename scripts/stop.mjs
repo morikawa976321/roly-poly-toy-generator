@@ -1,6 +1,10 @@
-// 開発用ポートを握っているプロセスツリーを潰して、ポートを解放する。
-// 直前の `npm run dev` を強制終了したときに、uvicorn のリローダの子や
-// vite の node プロセスが残ってしまったときの復旧用。
+/**
+ * 開発用ポートの孤児プロセス回収。
+ *
+ * 役割: `npm run stop` のエントリ。
+ * 働き: :8000 / :5173 を LISTEN している PID を検出しプロセスツリーを終了する。
+ *   dev.mjs を強制終了したあと uvicorn / vite が残ったときの復旧用。
+ */
 
 import { spawnSync } from "node:child_process";
 import process from "node:process";

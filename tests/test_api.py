@@ -1,7 +1,8 @@
 """API 層（`backend/app/api.py` + `backend/app/main.py`）の回帰テスト。
 
-`storage` レイヤ（= 実 DB アクセス）は monkeypatch でモックし、API
-側のバリデーション/分岐/ループガードだけを検証する。
+役割: FastAPI エンドポイントの契約・バリデーション検証。
+働き: TestClient で HTTP を叩き storage は monkeypatch でモックする。
+API 側のバリデーション/分岐/ループガードだけを検証する。
 """
 
 from __future__ import annotations

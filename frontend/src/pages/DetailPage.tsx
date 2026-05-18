@@ -1,3 +1,9 @@
+/**
+ * デザイン詳細・編集ページ。
+ *
+ * 役割: 単一 design の 3D プレビュー・パラメータ編集・STEP 出力（ルート `/designs/:id`）。
+ * 働き: getDesign / patchDesign、延長・カットのデバウンスプレビュー、computeMetrics・exportGeneToStepBlob を統合する。
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { DesignDetail } from "../types";

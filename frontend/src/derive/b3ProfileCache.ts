@@ -1,3 +1,9 @@
+/**
+ * B3 再フィット済みプロファイル (z,r) のメモリキャッシュ。
+ *
+ * 役割: effectiveGeneKey 単位で Pyodide 計算結果を共有・購読可能にする。
+ * 働き: GalleryPage / DetailPage が subscribe し、ensureB3Profile が set する。baseGeneKey / effectiveGeneKey でキャッシュキーを分離。
+ */
 import type { Gene } from "../types";
 
 export type ProfileSample = { z: number[]; r: number[] };

@@ -1,4 +1,9 @@
-"""デザインの永続化レイヤ（ローカル SQLite）。"""
+"""
+デザインのローカル SQLite 永続化。
+
+役割: design_id をキーとするデザイン正本 DB。
+働き: upsert / list / get / update / delete_all。gene JSON と metrics 列を保存し ``api`` から呼ばれる。
+"""
 
 from __future__ import annotations
 

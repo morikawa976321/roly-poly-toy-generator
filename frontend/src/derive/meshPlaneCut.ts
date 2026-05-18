@@ -1,3 +1,9 @@
+/**
+ * 傾斜上面カット（平面クリップ）の幾何処理。
+ *
+ * 役割: z <= z_cut + x·tan(θ) 側を残すメッシュ・プロファイル操作。
+ * 働き: mesh・feasibilityMetrics・thumbnailSvg・stepExporter が clip / silhouette / geneTopCutParams を利用。
+ */
 import type { Gene } from "../types";
 import * as THREE from "three";
 import { ShapeUtils } from "three";

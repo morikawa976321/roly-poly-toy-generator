@@ -1,3 +1,9 @@
+/**
+ * Three.js による 3D プレビュー。
+ *
+ * 役割: gene から回転体メッシュを表示する Canvas コンポーネント。
+ * 働き: DetailPage から gene・重心・profileVersion を受け取り derive/mesh で生成した geometry を OrbitControls で表示する。
+ */
 import { useMemo } from "react";
 import { Canvas } from "@react-three/fiber";
 import { Bounds, OrbitControls } from "@react-three/drei";

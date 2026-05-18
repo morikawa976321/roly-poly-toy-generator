@@ -1,4 +1,9 @@
-/** backend/app/physics.py の TS ポート（feasibility 判定）。 */
+/**
+ * ローリング feasibility 物理判定（backend 同等）。
+ *
+ * 役割: シルエット (z,r) から重心限界 z_cog_max 等を判定。
+ * 働き: feasibilityMetrics が feasibilityFromProfile を呼ぶ。backend/app/physics.py の TS ポート。
+ */
 
 const TILT_MAX_DEG = 75.0;
 const EPS_MM = 0.5;

@@ -1,4 +1,8 @@
-"""z_cog_max が smooth_profile 経由で 0 にならないことの回帰テスト。"""
+"""z_cog_max が smooth_profile 経由で 0 にならないことの回帰テスト。
+
+役割: 生成時 feasibility と compute_metrics 連携の回帰ガード。
+働き: サンプル gene・カットスイープ・既存 DB 設計で z_cog_max が正の有限値になることを検証する。
+"""
 
 from __future__ import annotations
 

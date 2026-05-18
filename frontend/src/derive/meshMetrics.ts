@@ -1,3 +1,9 @@
+/**
+ * BufferGeometry から体積・シルエット等のメトリクス抽出。
+ *
+ * 役割: 閉三角メッシュの符号付き体積と断面輪郭の数値化。
+ * 働き: metrics.ts が metricsFromGeometryWithFeas を呼ぶ。feasibilityExtras と合成して Metrics 型を満たす。
+ */
 import * as THREE from "three";
 import type { Metrics } from "../types";
 

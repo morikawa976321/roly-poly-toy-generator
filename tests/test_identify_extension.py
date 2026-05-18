@@ -1,3 +1,9 @@
+"""design_id が上部延長パラメータに依存しないことのテスト。
+
+役割: identify モジュールの gene 正規化境界の検証。
+働き: top_extension_mm を変えても design_id_for が同一になることを確認する。
+"""
+
 from backend.app.identify import design_id_for
 from backend.app.models import Gene
 

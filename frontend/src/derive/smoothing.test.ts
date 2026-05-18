@@ -1,10 +1,12 @@
+/**
+ * smoothProfile の backend 同等性テスト。
+ *
+ * 役割: smoothing.ts と backend/app/smoothing.py の不変条件固定。
+ * 働き: vitest が geneZNodes・DENSE_FACTOR・平滑化結果の性質を検証。片方修正時の静かな乖離を防ぐ。
+ */
 import { describe, expect, it } from "vitest";
 import type { Gene } from "../types";
 import { smoothProfile, geneZNodes, DENSE_FACTOR } from "./smoothing";
-
-// backend/app/smoothing.py (smooth_profile) と意図的に "同等挙動" を
-// 目指している実装。片方の修正がもう片方に反映されず静かに乖離する
-// のを避けるため、両実装で守るべき不変条件を固定する。
 
 function makeGene(
   radii: number[],

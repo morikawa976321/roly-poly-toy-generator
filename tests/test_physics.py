@@ -1,5 +1,8 @@
 """physics モジュールの単体テスト（既知形状の feasibility）。
 
+役割: feasibility_from_profile / rolypoly_feasibility の物理判定テスト。
+働き: 球・円柱・コーン等の既知形状と生成 gene で feasible/infeasible が期待どおりになることを検証する。
+
 テスト対象は主に ``feasibility_from_profile``（密サンプルから直接判定する
 高精度パス）。``rolypoly_feasibility``（radii 経由、保守的な近似）は
 生成→radii 化→再判定のラウンドトリップが成立することだけ確認する。

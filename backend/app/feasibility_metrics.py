@@ -1,4 +1,9 @@
-"""gene から z_cog_max / bottom_curvature_radius を算出（カット後子午線対応）。"""
+"""
+gene から feasibility 付加指標を算出。
+
+役割: ``z_cog_max`` / ``bottom_curvature_radius`` などカット後子午線に基づく指標。
+働き: 上部カットが有効ならメッシュ子午線を再構成し ``physics`` を適用。``metrics`` / ``storage`` が利用する。
+"""
 
 from __future__ import annotations
 

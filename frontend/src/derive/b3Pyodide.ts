@@ -1,5 +1,8 @@
 /**
- * ブラウザ上で SciPy UnivariateSpline (B3) を Pyodide 経由で実行する。
+ * ブラウザ上 SciPy B3 スプライン（Pyodide）。
+ *
+ * 役割: WASM Pyodide + numpy/scipy で UnivariateSpline を実行する非同期層。
+ * 働き: ensureB3Profile から b3RefitProfileAsync を呼び、密 (z,r) を B3 平滑化・再フィットする。初回 loadPackage で scipy を読み込む。
  */
 import type { Gene } from "../types";
 import { B3_SPLINE_S, DENSE_FACTOR, b3RefitS, geneZNodes } from "./smoothing";

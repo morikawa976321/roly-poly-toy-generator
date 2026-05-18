@@ -1,3 +1,9 @@
+/**
+ * 設計メトリクスの表示パネル。
+ *
+ * 役割: 詳細画面での数値一覧 UI。
+ * 働き: DetailPage から metrics / design_id / created_at を受け取り体積・寸法・重心等を表形式で表示する。
+ */
 import type { Metrics } from "../types";
 
 type Props = { metrics: Metrics; designId: string; createdAt: string };
