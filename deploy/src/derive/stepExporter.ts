@@ -19,7 +19,6 @@ import { revolutionGeometryFromGene } from "@core/derive/mesh";
 import {
   buildMeridianProfileForStep,
   makeProfileSplineEdge,
-  subsampleProfileUniformZ,
 } from "./stepProfile.ts";
 import { loadOpenCascade } from "@core/derive/stepOcctLoader";
 
