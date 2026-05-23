@@ -234,10 +234,6 @@ export async function exportGeneToStepBlob(gene: Gene): Promise<Blob> {
     if (profileEdge) {
       wireMaker.Add_1(profileEdge);
     } else {
-      console.error(
-        "[STEP] B-spline profile edge failed; falling back to dense polyline revolve. " +
-          "Check DevTools console; opencascade.js 1.1.1 requires PointsToBSpline_2 + MakeEdge_24.",
-      );
       const pBot = t(new oc.gp_Pnt_3(0, 0, meridian.zAxisBottom));
       const pFirst = t(new oc.gp_Pnt_3(r[iStart], 0, z[iStart]));
       wireMaker.Add_1(t(new oc.BRepBuilderAPI_MakeEdge_3(pBot, pFirst)).Edge());

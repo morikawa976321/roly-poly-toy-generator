@@ -137,7 +137,7 @@ function dedupeProfileZ(
 type Oc = any;
 
 /** opencascade.js 1.1.1: 無引数 ctor + Resize(1, n, false) */
-export function buildPointArray(
+function buildPointArray(
   oc: Oc,
   z: number[],
   r: number[],

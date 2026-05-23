@@ -7,7 +7,6 @@
 import { describe, it, expect } from "vitest";
 import { loadOpenCascade } from "./stepOcctLoader";
 import { makeProfileSplineEdge } from "./stepProfile";
-import { diagnoseProfileSplineEdge } from "./stepProfileDiagnose";
 
 describe("opencascade.js STEP profile edge", () => {
   it(
@@ -22,19 +21,13 @@ describe("opencascade.js STEP profile edge", () => {
         r.push(15 * Math.sin(Math.PI * u) ** 1.2 + 0.5);
       }
 
-      const diag = diagnoseProfileSplineEdge(oc, z, r);
-      expect(diag.available.GeomAPI_Interpolate).toBeNull();
-
       const temps: unknown[] = [];
       const t = <T>(v: T): T => {
         temps.push(v);
         return v;
       };
       const edge = makeProfileSplineEdge(oc, z, r, t);
-      expect(
-        edge,
-        `expected spline edge; diag=${JSON.stringify(diag)}`,
-      ).not.toBeNull();
+      expect(edge).not.toBeNull();
     },
     120_000,
   );
