@@ -3,6 +3,7 @@
  *
  * 役割: deploy/src/derive のソース更新（sync-core npm script）。
  * 働き: stepExporter / stepProfile をコピーし import を @core に差し替え、Auto-synced ヘッダを付与する。
+ * stepOcctLoader は deploy 同梱せず @core/derive へ解決する。
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -26,7 +27,11 @@ function rewriteCoreImports(content) {
       'from "@core/derive/profileExtension"',
     )
     .replace('from "./meshPlaneCut"', 'from "@core/derive/meshPlaneCut"')
-    .replace('from "./mesh"', 'from "@core/derive/mesh"');
+    .replace('from "./mesh"', 'from "@core/derive/mesh"')
+    .replace(
+      'from "./stepOcctLoader"',
+      'from "@core/derive/stepOcctLoader"',
+    );
 }
 
 fs.mkdirSync(outDir, { recursive: true });

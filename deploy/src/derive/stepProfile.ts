@@ -5,10 +5,11 @@
  *
  * 役割: (z,r) 点列の間引きと OpenCascade スプラインエッジ生成。
  * 働き: stepExporter が subsampleProfileUniformZ / makeProfileSplineEdge で母線を OCCT に渡す。
+ * 制約: opencascade.js 1.1.1 は GeomAPI_Interpolate 非同梱。PointsToBSpline_2 + Handle_Geom_Curve_2 + MakeEdge_24 が必須。
  */
 
-/** スプライン近似に渡す最大点数（多すぎると補間が不安定） */
-const STEP_PROFILE_MAX_POINTS = 96;
+/** スプライン近似に渡す最大点数 */
+const STEP_PROFILE_MAX_POINTS = 64;
 
 /** z 等間隔に間引き（端点は必ず含める） */
 export function subsampleProfileUniformZ(
@@ -29,7 +30,7 @@ export function subsampleProfileUniformZ(
       zz.push(z[i]);
       rr.push(r[i]);
     }
-    return { z: zz, r: rr };
+    return dedupeProfileZ(zz, rr);
   }
 
   const z0 = z[iStart];
@@ -56,52 +57,176 @@ export function subsampleProfileUniformZ(
   rr[0] = r[iStart];
   zz[zz.length - 1] = z[iEnd];
   rr[rr.length - 1] = r[iEnd];
+  return dedupeProfileZ(zz, rr);
+}
+
+export type MeridianProfileForStep = {
+  z: number[];
+  r: number[];
+  /** 閉ワイヤー用の底軸 z（gene v2 では z[0]） */
+  zAxisBottom: number;
+  /** 閉ワイヤー用の上端軸 z */
+  zAxisTop: number;
+  /** 上端が軸上（r≈0）ならスプラインが極まで届く */
+  topOnAxis: boolean;
+};
+
+/**
+ * STEP 用子午線点列。底極 (r=0,z[0]) を含め、(A) の径方向スタブを廃止する。
+ * PointsToBSpline の始端オーバーシュート＋回転で底部にでっぱりが出るのを防ぐ。
+ */
+export function buildMeridianProfileForStep(
+  z: number[],
+  r: number[],
+  eps = 1e-6,
+): MeridianProfileForStep {
+  let iStart = 0;
+  while (iStart < z.length && r[iStart] <= eps) iStart++;
+  let iEnd = z.length - 1;
+  while (iEnd >= 0 && r[iEnd] <= eps) iEnd--;
+
+  const zAxisBottom = z[0];
+  const zAxisTop = z[z.length - 1];
+  const topOnAxis = r[z.length - 1] <= eps;
+
+  const zz: number[] = [zAxisBottom];
+  const rr: number[] = [0];
+
+  if (iStart <= iEnd) {
+    const bodyMax = Math.max(4, STEP_PROFILE_MAX_POINTS - (topOnAxis ? 2 : 1));
+    const body = subsampleProfileUniformZ(z, r, iStart, iEnd, bodyMax);
+    for (let i = 0; i < body.z.length; i++) {
+      const zi = body.z[i];
+      const ri = body.r[i];
+      if (zi <= zAxisBottom + 1e-9 && ri <= eps) continue;
+      if (topOnAxis && zi >= zAxisTop - 1e-9 && ri <= eps) continue;
+      zz.push(zi);
+      rr.push(ri);
+    }
+  }
+
+  if (topOnAxis) {
+    zz.push(zAxisTop);
+    rr.push(0);
+  }
+
+  const deduped = dedupeProfileZ(zz, rr);
+  return {
+    ...deduped,
+    zAxisBottom,
+    zAxisTop: topOnAxis ? zAxisTop : z[iEnd],
+    topOnAxis,
+  };
+}
+
+function dedupeProfileZ(
+  z: number[],
+  r: number[],
+): { z: number[]; r: number[] } {
+  const zz: number[] = [];
+  const rr: number[] = [];
+  for (let i = 0; i < z.length; i++) {
+    if (zz.length > 0 && Math.abs(z[i] - zz[zz.length - 1]) <= 1e-9) continue;
+    zz.push(z[i]);
+    rr.push(r[i]);
+  }
   return { z: zz, r: rr };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Oc = any;
 
-function ocCtor(
-  oc: Oc,
-  base: string,
-  prefer: number[] = [],
-): ((...args: unknown[]) => unknown) | null {
-  for (const i of prefer) {
-    const c = oc[`${base}_${i}`];
-    if (typeof c === "function") return c;
-  }
-  for (let i = 1; i <= 32; i++) {
-    const c = oc[`${base}_${i}`];
-    if (typeof c === "function") return c;
-  }
-  return typeof oc[base] === "function" ? oc[base] : null;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function makeHPointArray(
+/** opencascade.js 1.1.1: 無引数 ctor + Resize(1, n, false) */
+export function buildPointArray(
   oc: Oc,
   z: number[],
   r: number[],
   t: <T>(obj: T) => T,
-): any {
+): unknown {
   const n = z.length;
-  const HArrayCtor = ocCtor(oc, "TColgp_HArray1OfPnt", [2, 1]);
-  if (!HArrayCtor) {
-    throw new Error("opencascade.js: TColgp_HArray1OfPnt not available");
+  const ArrayCtor =
+    oc.TColgp_Array1OfPnt_1 ??
+    oc.TColgp_Array1OfPnt_2 ??
+    oc.TColgp_Array1OfPnt;
+  if (typeof ArrayCtor !== "function") {
+    throw new Error("opencascade.js: TColgp_Array1OfPnt not available");
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const arr = t(new (HArrayCtor as any)(1, n));
+  const arr = t(new (ArrayCtor as any)());
+  const resize = (arr as { Resize: (lo: number, hi: number, copy: boolean) => void })
+    .Resize;
+  resize.call(arr, 1, n, false);
+
   const setValue =
     typeof arr.SetValue === "function"
-      ? (idx: number, p: unknown) => arr.SetValue(idx, p)
-      : (idx: number, p: unknown) => arr.setValue(idx, p);
+      ? (i: number, p: unknown) => arr.SetValue(i, p)
+      : (i: number, p: unknown) => arr.setValue(i, p);
 
   for (let i = 0; i < n; i++) {
     setValue(i + 1, t(new oc.gp_Pnt_3(r[i], 0, z[i])));
   }
   return arr;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function bareGeomCurve(curveHandle: any): any {
+  if (curveHandle && typeof curveHandle.get === "function") {
+    return curveHandle.get();
+  }
+  return curveHandle;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeGeomCurveFromPoints(
+  oc: Oc,
+  z: number[],
+  r: number[],
+  t: <T>(obj: T) => T,
+): any | null {
+  const pts = buildPointArray(oc, z, r, t);
+  const geomAbs = oc.GeomAbs_Shape?.GeomAbs_C2 ?? oc.GeomAbs_C2 ?? 2;
+  const P2B = oc.GeomAPI_PointsToBSpline_2;
+  if (typeof P2B !== "function") return null;
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    // 端点乖離を抑えて底部オーバーシュート（でっぱり）を減らす
+    const p2b = t(new (P2B as any)(pts, 3, 8, geomAbs, 1e-6));
+    if (typeof p2b.Curve !== "function") return null;
+    return p2b.Curve();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Handle_Geom_BSplineCurve → Handle_Geom_Curve → TopoDS_Edge。
+ * opencascade.js 1.1.1 では MakeEdge_24(Handle_Geom_Curve) のみが有効（実測）。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function makeEdgeFromGeomCurve(
+  oc: Oc,
+  curveHandle: any,
+  t: <T>(obj: T) => T,
+): any | null {
+  const bare = bareGeomCurve(curveHandle);
+  const HandleCtor = oc.Handle_Geom_Curve_2 ?? oc.Handle_Geom_Curve_1;
+  const EdgeCtor = oc.BRepBuilderAPI_MakeEdge_24 ?? oc.BRepBuilderAPI_MakeEdge_23;
+  if (typeof HandleCtor !== "function" || typeof EdgeCtor !== "function") {
+    return null;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const hCurve = t(new (HandleCtor as any)(bare));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mk = t(new (EdgeCtor as any)(hCurve));
+    if (typeof mk.IsDone === "function" && !mk.IsDone()) return null;
+    return mk.Edge();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -118,55 +243,9 @@ export function makeProfileSplineEdge(
   if (z.length < 2 || z.length !== r.length) return null;
 
   try {
-    const hPoints = makeHPointArray(oc, z, r, t);
-
-    const InterpCtor = ocCtor(oc, "GeomAPI_Interpolate", [1, 2]);
-    if (!InterpCtor) return null;
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const interp = t(new (InterpCtor as any)(hPoints, false, 1e-3));
-    if (typeof interp.Perform === "function") {
-      interp.Perform();
-    } else if (typeof interp.perform === "function") {
-      interp.perform();
-    }
-
-    if (typeof interp.IsDone === "function" && !interp.IsDone()) {
-      return null;
-    }
-
-    const curve =
-      typeof interp.Curve === "function"
-        ? interp.Curve()
-        : typeof interp.curve === "function"
-          ? interp.curve()
-          : null;
-    if (!curve) return null;
-
-    const makeEdgeCtors = [
-      24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8,
-    ];
-    for (const idx of makeEdgeCtors) {
-      const EdgeCtor = oc[`BRepBuilderAPI_MakeEdge_${idx}`];
-      if (typeof EdgeCtor !== "function") continue;
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const mk = t(new (EdgeCtor as any)(curve));
-        if (typeof mk.IsDone === "function" && !mk.IsDone()) continue;
-        return mk.Edge();
-      } catch {
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const mk = t(new (EdgeCtor as any)(curve, 0, 1));
-          if (typeof mk.IsDone === "function" && !mk.IsDone()) continue;
-          return mk.Edge();
-        } catch {
-          // next overload
-        }
-      }
-    }
-
-    return null;
+    const curveHandle = makeGeomCurveFromPoints(oc, z, r, t);
+    if (!curveHandle) return null;
+    return makeEdgeFromGeomCurve(oc, curveHandle, t);
   } catch {
     return null;
   }

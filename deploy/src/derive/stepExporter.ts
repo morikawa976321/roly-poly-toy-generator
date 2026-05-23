@@ -17,12 +17,11 @@ import {
 } from "@core/derive/meshPlaneCut";
 import { revolutionGeometryFromGene } from "@core/derive/mesh";
 import {
+  buildMeridianProfileForStep,
   makeProfileSplineEdge,
   subsampleProfileUniformZ,
 } from "./stepProfile.ts";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let ocPromise: Promise<any> | null = null;
+import { loadOpenCascade } from "@core/derive/stepOcctLoader";
 
 /** カット平面 z = zCut + u·tanA 上の大きな矩形フェース（MakeFace_2 の UV 版は 1.1.1 で非対応） */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,30 +182,10 @@ function applyStepPlaneCut(
   return booleanCommonSolid(oc, solid, halfSolid, t);
 }
 
-/**
- * opencascade.js の WASM インスタンスを lazy-load する。
- * 初回のみロード（~65 MB）、以降はキャッシュを返す。
- */
+/** opencascade.js WASM（stepOcctLoader と共有） */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getOC(): Promise<any> {
-  if (!ocPromise) {
-    ocPromise = (async () => {
-      // Vite が WASM バイナリを静的アセット URL として扱えるよう ?url で import
-      const [glueModule, wasmModule] = await Promise.all([
-        import("opencascade.js/dist/opencascade.wasm.js"),
-        // @ts-expect-error Vite ?url import
-        import("opencascade.js/dist/opencascade.wasm.wasm?url"),
-      ]);
-      const initOC = glueModule.default ?? glueModule;
-      return initOC({
-        locateFile: (path: string) => {
-          if (path.endsWith(".wasm")) return wasmModule.default;
-          return path;
-        },
-      });
-    })();
-  }
-  return ocPromise;
+  return loadOpenCascade();
 }
 
 /**
@@ -251,42 +230,48 @@ export async function exportGeneToStepBlob(gene: Gene): Promise<Blob> {
     // ---------- ワイヤー構築 ----------
     const wireMaker = t(new oc.BRepBuilderAPI_MakeWire_1());
 
-    // (A) 底の軸点 → プロファイル始点
-    {
-      const pAxis = t(new oc.gp_Pnt_3(0, 0, z[iStart]));
-      const pFirst = t(new oc.gp_Pnt_3(r[iStart], 0, z[iStart]));
-      const edgeMaker = t(new oc.BRepBuilderAPI_MakeEdge_3(pAxis, pFirst));
-      wireMaker.Add_1(edgeMaker.Edge());
-    }
-
-    // (B) プロファイル曲線 — B-spline 1 本（失敗時は直線セグメントにフォールバック）
-    const { z: zSub, r: rSub } = subsampleProfileUniformZ(z, r, iStart, iEnd);
-    const profileEdge = makeProfileSplineEdge(oc, zSub, rSub, t);
+    // (A) 子午面: 底極 → プロファイル →（必要なら上端は rt>0 で止める）を B-spline 1 本
+    const meridian = buildMeridianProfileForStep(z, r, eps);
+    const profileEdge = makeProfileSplineEdge(oc, meridian.z, meridian.r, t);
     if (profileEdge) {
       wireMaker.Add_1(profileEdge);
     } else {
+      console.error(
+        "[STEP] B-spline profile edge failed; falling back to dense polyline revolve. " +
+          "Check DevTools console; opencascade.js 1.1.1 requires PointsToBSpline_2 + MakeEdge_24.",
+      );
+      const pBot = t(new oc.gp_Pnt_3(0, 0, meridian.zAxisBottom));
+      const pFirst = t(new oc.gp_Pnt_3(r[iStart], 0, z[iStart]));
+      wireMaker.Add_1(t(new oc.BRepBuilderAPI_MakeEdge_3(pBot, pFirst)).Edge());
       for (let i = iStart; i < iEnd; i++) {
         const p0 = t(new oc.gp_Pnt_3(r[i], 0, z[i]));
         const p1 = t(new oc.gp_Pnt_3(r[i + 1], 0, z[i + 1]));
-        const edgeMaker = t(new oc.BRepBuilderAPI_MakeEdge_3(p0, p1));
-        wireMaker.Add_1(edgeMaker.Edge());
+        wireMaker.Add_1(t(new oc.BRepBuilderAPI_MakeEdge_3(p0, p1)).Edge());
+      }
+      if (!meridian.topOnAxis) {
+        const pLast = t(new oc.gp_Pnt_3(r[iEnd], 0, z[iEnd]));
+        const pAxis = t(new oc.gp_Pnt_3(0, 0, meridian.zAxisTop));
+        wireMaker.Add_1(t(new oc.BRepBuilderAPI_MakeEdge_3(pLast, pAxis)).Edge());
+      }
+      if (Math.abs(meridian.zAxisTop - meridian.zAxisBottom) > eps) {
+        const pTop = t(new oc.gp_Pnt_3(0, 0, meridian.zAxisTop));
+        const pBotAxis = t(new oc.gp_Pnt_3(0, 0, meridian.zAxisBottom));
+        wireMaker.Add_1(t(new oc.BRepBuilderAPI_MakeEdge_3(pTop, pBotAxis)).Edge());
       }
     }
 
-    // (C) プロファイル終点 → 上端の軸点
-    {
+    // (B) 上端が軸上でないときだけ、プロファイル終端 → 軸へ直線
+    if (!meridian.topOnAxis) {
       const pLast = t(new oc.gp_Pnt_3(r[iEnd], 0, z[iEnd]));
-      const pAxis = t(new oc.gp_Pnt_3(0, 0, z[iEnd]));
-      const edgeMaker = t(new oc.BRepBuilderAPI_MakeEdge_3(pLast, pAxis));
-      wireMaker.Add_1(edgeMaker.Edge());
+      const pAxis = t(new oc.gp_Pnt_3(0, 0, meridian.zAxisTop));
+      wireMaker.Add_1(t(new oc.BRepBuilderAPI_MakeEdge_3(pLast, pAxis)).Edge());
     }
 
-    // (D) 軸上閉路: 上端軸点 → 底軸点
-    if (Math.abs(z[iEnd] - z[iStart]) > eps) {
-      const pTop = t(new oc.gp_Pnt_3(0, 0, z[iEnd]));
-      const pBot = t(new oc.gp_Pnt_3(0, 0, z[iStart]));
-      const edgeMaker = t(new oc.BRepBuilderAPI_MakeEdge_3(pTop, pBot));
-      wireMaker.Add_1(edgeMaker.Edge());
+    // (C) 軸上で閉じる（上端軸 → 底極）
+    if (Math.abs(meridian.zAxisTop - meridian.zAxisBottom) > eps) {
+      const pTop = t(new oc.gp_Pnt_3(0, 0, meridian.zAxisTop));
+      const pBot = t(new oc.gp_Pnt_3(0, 0, meridian.zAxisBottom));
+      wireMaker.Add_1(t(new oc.BRepBuilderAPI_MakeEdge_3(pTop, pBot)).Edge());
     }
 
     const wire = wireMaker.Wire();
